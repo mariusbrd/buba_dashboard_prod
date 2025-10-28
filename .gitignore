@@ -12,3 +12,5 @@ __pycache__/
 *.pem
 *.pfx
 *.key
+.ghtoken
+.gh_token
