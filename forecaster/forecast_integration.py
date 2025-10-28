@@ -790,18 +790,19 @@ class DashboardForecastAdapter:
     # Config-Aufbau für die Pipeline
     # ------------------------------------------------------------
     def _build_config(
-        self,
+            self,
         *,
         excel_path: str,
         horizon: int,
         use_cached: bool,
         selected_exog: List[str]
-    ) -> "PipelineConfig":
+        ) -> "PipelineConfig":
         """
         Baut die Pipeline-Konfiguration:
         - liest die Zielspalte dynamisch aus dem Excel (alles außer 'Datum')
         - bereinigt ausgewählte Exogs (entfernt interne Flags)
-        - setzt Cache-Tag konsistent nach UI-Target/Modus/Horizont
+        - setzt Cache-Tag konsistent nach Sektor/UI-Target/Modus/Horizont
+        - namespaced Model-/Output-Verzeichnisse pro Sektor
         - nutzt PipelineConfig (alias für Config) aus forecaster_pipeline
         - filtert unbekannte/inkompatible Keyword-Argumente dynamisch weg
         """
@@ -818,9 +819,22 @@ class DashboardForecastAdapter:
 
         ui_target = (
             self.pipeline_info.get("ui_target") if isinstance(self.pipeline_info, dict) else None
-        ) or "einlagen"
-        ui_mode = "fluss" if any("__flows_flag__" in str(x) for x in exog_final) else "bestand"
-        cache_tag = f"{str(ui_target).lower()}_{ui_mode}_h{int(horizon or 4)}"
+        ) or "Wertpapiere"
+
+        # Modus primär aus UI (Switch), fallback auf Heuristik aus Exogs
+        ui_mode = "fluss" if (
+            (isinstance(self.pipeline_info, dict) and self.pipeline_info.get("use_flows"))
+            or any("__flows_flag__" in str(x) for x in exog_final)
+        ) else "bestand"
+
+        # NEU: Sektor (PH/NFK) aus UI für Cache & Pfade
+        sektor = (
+            (self.pipeline_info.get("sektor") if isinstance(self.pipeline_info, dict) else None)
+            or "PH"
+        )
+        sektor_slug = str(sektor).strip().upper()  # "PH" / "NFK"
+
+        cache_tag = f"{sektor_slug.lower()}_{str(ui_target).lower()}_{ui_mode}_h{int(horizon or 4)}"
 
         # 2) Zielspalte dynamisch aus Excel ziehen
         try:
@@ -829,10 +843,10 @@ class DashboardForecastAdapter:
             cols = ["Datum", "PH_EINLAGEN"]  # Fallback
         target_col = next((c for c in cols if str(c).lower() != "datum"), None) or "PH_EINLAGEN"
 
-        # 3) Output-/Model-Ordner sicherstellen
+        # 3) Output-/Model-Ordner sicherstellen (NEU: pro Sektor namespacen)
         forecaster_dir = Path(__file__).parent
-        output_dir = (forecaster_dir / "trained_outputs").resolve()
-        model_dir = (forecaster_dir / "trained_models").resolve()
+        output_dir = (forecaster_dir / "trained_outputs" / sektor_slug).resolve()
+        model_dir = (forecaster_dir / "trained_models" / sektor_slug).resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
         model_dir.mkdir(parents=True, exist_ok=True)
 
@@ -875,29 +889,22 @@ class DashboardForecastAdapter:
 
             # Exogs
             selected_exog=list(exog_clean),
-
-            # ⚠️ Falls in manchen Branches vorher zusätzliche Flags gesetzt wurden
-            # (z. B. 'degenerate_fix'), tauchen sie NICHT mehr hier auf.
-            # Wenn du trotzdem experimentelle Keys hinzufügen willst, füge sie hier
-            # hinzu – sie werden unten automatisch herausgefiltert, falls unbekannt:
-            # degenerate_fix=True,
         )
 
         # 4b) Dynamisch nur die vom tatsächlichen Config-Dataclass erlaubten Keys durchlassen
         allowed_keys = set()
         ignored_keys = []
         try:
-            # Dataclasses-Fall (empfohlen)
             from dataclasses import fields as _dc_fields, is_dataclass as _is_dc
             if _is_dc(PipelineConfig):
                 allowed_keys = {f.name for f in _dc_fields(PipelineConfig)}
             else:
-                # Fallback: inspect.signature
                 import inspect as _inspect
                 sig = _inspect.signature(PipelineConfig)
-                allowed_keys = {p.name for p in sig.parameters.values() if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)}
+                allowed_keys = {p.name for p in sig.parameters.values()
+                                if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)}
         except Exception:
-            # Harte Fallback-Whitelist, falls oben fehlschlägt (halte minimal)
+            # Minimal-Whitelist als Fallback
             allowed_keys = {
                 "excel_path", "sheet_name", "date_col", "target_col",
                 "agg_methods_exog", "agg_method_target", "exog_month_lags",
@@ -942,12 +949,15 @@ class DashboardForecastAdapter:
             LOGGER.info(f"[Adapter] Config.selected_exog: {getattr(cfg, 'selected_exog', None)}")
             if hasattr(cfg, "exog_cols"):
                 LOGGER.info(f"[Adapter] Config.exog_cols: {getattr(cfg, 'exog_cols', None)}")
-            LOGGER.info(f"[Adapter] cache_tag={getattr(cfg, 'cache_tag', None)}, horizon={getattr(cfg, 'forecast_horizon', None)}, ui_mode={ui_mode}")
+            LOGGER.info(
+                f"[Adapter] cache_tag={getattr(cfg, 'cache_tag', None)}, "
+                f"horizon={getattr(cfg, 'forecast_horizon', None)}, "
+                f"ui_mode={ui_mode}, sektor={sektor_slug}"
+            )
         except Exception:
             pass
 
         return cfg
-
 
 
     # ------------------------------------------------------------
@@ -1275,6 +1285,7 @@ class DashboardForecastAdapter:
     # ------------------------------------------------------------
     # Hauptmethode: Pipeline laufen lassen (mit Cache-Handling & CI)
     # ------------------------------------------------------------
+
     def run_forecast(
         self,
         target: str,
@@ -1288,7 +1299,11 @@ class DashboardForecastAdapter:
     ):
         """
         Führt Forecast durch mit Konfidenzintervallen und Backtest-Generierung.
-        (mit Punkt A: Exog-Resolve + Guards + Polling auf Exog-Verfügbarkeit)
+        Enthält:
+        - kurzes Warten auf Exog-Verfügbarkeit (falls Loader async)
+        - robustes Auflösen/Validieren der Exogs
+        - Config-Bau mit Cache-Check (Feature-Mismatch invalidiert Cache)
+        - Pipeline-Run + CI-Anreicherung + Backtest
         """
         if confidence_levels is None:
             confidence_levels = [80, 95]
@@ -1303,11 +1318,7 @@ class DashboardForecastAdapter:
 
         temp_excel: Optional[str] = None
         try:
-            # --- B) Warten bis Exogs verfügbar sind (falls Loader asynchron arbeitet) --------
-            # Hooks (optional):
-            #   - self.fetch_exogs(codes: list[str]) -> None   : stößt Download an
-            #   - self.get_exog_data() -> pd.DataFrame | None  : liefert aktuellen Exog-Frame
-            #   - self.exog_data                                : DataFrame im Adapter
+            # -------- B) Exogene ggf. kurz "heranpolling", falls noch im Laden ----------
             try:
                 import time
                 requested = list(selected_exog or [])
@@ -1361,15 +1372,15 @@ class DashboardForecastAdapter:
             except Exception as _e_wait:
                 LOGGER.warning(f"[Adapter|Exog] Wait-Block übersprungen: {_e_wait}")
 
-            # 1) Daten vorbereiten (MS, kein Backfill) – erst NACH dem Wait-Block!
+            # -------- 1) Daten vorbereiten (MS, kein Backfill) ----------
             prepared_df = self.prepare_pipeline_data(
                 target=target,
                 selected_exog=selected_exog,
                 use_flows=use_flows,
-                horizon_quarters=int(horizon or 0),
+                horizon_quarters=int(horizon or 0),  # ← wichtig: MS-Projektion Exogs bis in Zukunft
             )
 
-            # ---- 1a) Resolve & Filter der Exogs im DataFrame (sanft, nicht abbrechen) ----
+            # 1a) Exogs im DF robust auflösen + sanft filtern
             def _resolve_exogs_in_df(df: pd.DataFrame, requested: List[str]) -> tuple[list[str], dict]:
                 cols_set = {str(c) for c in df.columns}
                 variants_map = self._expand_exog_variants(requested or [])
@@ -1396,10 +1407,10 @@ class DashboardForecastAdapter:
             else:
                 LOGGER.warning("[Guard] Keine Exogs im DF auflösbar – Forecast läuft ohne Exogene weiter.")
 
-            # Für die nachfolgenden Schritte merken
+            # Für nachfolgende Schritte merken
             self.pipeline_info["exog_cols"] = list(resolved_exogs)
 
-            # 1b) DF-Guard (non-strict: nur Hinweis/Logging, kein Abbruch)
+            # 1b) DF-Guard (non-strict: nur Hinweis/Logging)
             try:
                 self._validate_exog_presence_in_df(
                     df_final=prepared_df,
@@ -1410,14 +1421,14 @@ class DashboardForecastAdapter:
             except Exception as e_guard_df:
                 LOGGER.warning(f"[Guard/DF] (non-strict) Hinweis: {e_guard_df}")
 
-            # 2) Excel erzeugen
+            # -------- 2) Excel erzeugen & prüfen ----------
             temp_excel = self.create_temp_excel(prepared_df)
 
-            # 2a) Excel-Guard gegen die **gefilterten** Exogs (strict=True)
+            # 2a) Excel-Guard (strict=True) nur gegen effektiv vorhandene Exogs
             try:
                 self._validate_exog_presence_in_excel(
                     excel_path=temp_excel,
-                    selected_exog=list(resolved_exogs),  # nur die wirklich vorhandenen
+                    selected_exog=list(resolved_exogs),
                     sheet_name="final_dataset",
                     strict=True,
                     logger=LOGGER,
@@ -1426,7 +1437,7 @@ class DashboardForecastAdapter:
                 LOGGER.error(f"[Guard/Excel] Validierung fehlgeschlagen: {e_guard_xlsx}")
                 raise
 
-            # 3) Config bauen – mit den **effektiv** vorhandenen Exogs
+            # -------- 3) Config bauen (mit effektiv vorhandenen Exogs) ----------
             used_exog = list(self.pipeline_info.get("exog_cols") or [])
             cfg = self._build_config(
                 excel_path=temp_excel,
@@ -1435,7 +1446,7 @@ class DashboardForecastAdapter:
                 selected_exog=used_exog,
             )
 
-            # 3a) Optional: Vorgegebenes Modell aus Preset nutzen (PKL-Reuse)
+            # 3a) Optional: Preload-PKL (z. B. aus Preset) übernehmen, wenn kompatibel
             try:
                 if preload_model_path and os.path.exists(preload_model_path):
                     exp_path = get_model_filepath(cfg)
@@ -1455,20 +1466,17 @@ class DashboardForecastAdapter:
             except Exception as _e_pl:
                 LOGGER.warning(f"[Adapter] Konnte Preload-PKL nicht verwenden: {_e_pl}")
 
-            # Kurze Config-Zusammenfassung
+            # Kurze Config-Summary
             LOGGER.info("\n[Adapter] Config summary:")
-            dbg_keys = [
-                "forecast_horizon", "agg_method_target", "agg_methods_exog", "exog_month_lags",
-                "target_lags_q", "add_trend_features", "trend_degree", "add_seasonality",
-                "future_exog_strategy", "target_transform", "target_standardize",
-            ]
-            for k in dbg_keys:
+            for k in ["forecast_horizon","agg_method_target","agg_methods_exog","exog_month_lags",
+                    "target_lags_q","add_trend_features","trend_degree","add_seasonality",
+                    "future_exog_strategy","target_transform","target_standardize"]:
                 LOGGER.info(f"  {k}: {getattr(cfg, k, None)}")
             LOGGER.info(f"  Excel: {cfg.excel_path}")
             LOGGER.info(f"  Model dir: {cfg.model_dir}")
             LOGGER.info(f"  selected_exog/exog_cols: {getattr(cfg, 'selected_exog', [])}")
 
-            # 4) Cache-Check bzgl. Exog-Änderungen
+            # -------- 4) Cache-Check bzgl. Exog-Änderungen ----------
             model_path = get_model_filepath(cfg)
             if ModelArtifact and hasattr(ModelArtifact, "exists") and ModelArtifact.exists(model_path):
                 try:
@@ -1488,13 +1496,13 @@ class DashboardForecastAdapter:
                 except Exception as _e_load:
                     LOGGER.warning(f"[Cache] Konnte Cache nicht prüfen: {_e_load}")
 
-            # 5) Pipeline ausführen
+            # -------- 5) Pipeline ausführen ----------
             LOGGER.info(_sym("\n[Adapter] Starte Pipeline."))
             LOGGER.info(f"  Cache: {'verwendet' if use_cached else 'ignoriere'}")
             LOGGER.info(f"  Force-Retrain: {force_retrain}")
             forecast_df, metadata = run_production_pipeline(cfg, force_retrain)
 
-            # 6) Modellpfad + Snapshot persistieren
+            # -------- 6) Modellpfad + Snapshot persistieren ----------
             model_path = get_model_filepath(cfg)
             if isinstance(metadata, dict):
                 metadata["model_path"] = model_path
@@ -1510,12 +1518,13 @@ class DashboardForecastAdapter:
             except Exception as _e_pq:
                 LOGGER.warning(f"[Adapter] Snapshot konnte nicht geschrieben werden: {_e_pq}")
 
-            # 7) Residuen extrahieren & CIs hinzufügen
+            # -------- 7) Konfidenzintervalle hinzufügen ----------
             try:
                 LOGGER.info(_sym("\n[Adapter] Berechne Konfidenzintervalle"))
                 residuals = self._extract_residuals_from_pipeline(metadata, model_path)
 
                 if residuals is None or (isinstance(residuals, (list, np.ndarray, pd.Series)) and len(residuals) == 0):
+                    # Fallback: CV-RMSE nutzen, falls vorhanden
                     cv_rmse = None
                     try:
                         cv_perf = (metadata or {}).get("cv_performance", {})
@@ -1537,6 +1546,7 @@ class DashboardForecastAdapter:
                         confidence_levels=confidence_levels,
                         forecast_col="Forecast"
                     )
+                    # std_error in Metadaten ablegen (hilfreich für Coverage-Diagnostik)
                     if isinstance(metadata, dict):
                         try:
                             res_arr = np.asarray(residuals, dtype=float)
@@ -1554,29 +1564,9 @@ class DashboardForecastAdapter:
                 LOGGER.error(f"[CI] Fehler bei Konfidenzintervall-Berechnung: {e_ci}")
                 LOGGER.warning("[CI] Forecast wird ohne Konfidenzintervalle zurückgegeben")
 
-            # --- OUTPUT DIAGNOSTICS: Forecast-Flatline -------------------------
+            # -------- 8) Backtest erzeugen ----------
             try:
-                yhat = None
-                for c in ["Forecast", "yhat", "y_pred"]:
-                    if c in forecast_df.columns:
-                        yhat = forecast_df[c].astype(float)
-                        break
-                if yhat is not None and len(yhat) >= 2:
-                    std_yhat = float(yhat.std(ddof=1))
-                    mean_yhat = float(yhat.mean())
-                    flat = std_yhat < 1e-8
-                    (metadata.setdefault("diagnostics", {})
-                            .setdefault("forecast", {})
-                            .update({"std": std_yhat, "mean": mean_yhat, "is_flatline": flat}))
-                    if flat:
-                        LOGGER.warning("[DIAG|FORECAST] Prognose ist (nahezu) konstant – mögliche Ursachen: "
-                                    "degenerates Target/Features, starke Regularisierung oder fehlerhafte Transformation")
-            except Exception as _e:
-                LOGGER.warning(f"[DIAG|FORECAST] übersprungen: {_e}")
-
-            # 8) Backtest – unverändert
-            try:
-                LOGGER.info("[Adapter] Generiere Backtest-Daten...")
+                LOGGER.info("[Adapter] Generiere Backtest-Daten.")
                 if ModelArtifact and hasattr(ModelArtifact, 'exists') and ModelArtifact.exists(model_path):
                     artifact = ModelArtifact.load(model_path)
                     X_train = artifact.metadata.get('X_train')
@@ -1604,117 +1594,480 @@ class DashboardForecastAdapter:
                         y_train = df_feats[cfg.target_col]
                         if 'Q_end' in df_feats.columns:
                             dates_train = df_feats['Q_end']
-                        elif 'Q' in df_feats.columns:
-                            dates_train = df_feats['Q']
                         else:
-                            dates_train = df_feats.index
+                            dates_train = df_feats[getattr(cfg, "date_col", "Datum")]
 
-                    try:
-                        yv = pd.Series(y_train).astype(float)
-                        diag_train = {
-                            "y_std": float(yv.std(ddof=1)) if len(yv) > 1 else 0.0,
-                            "y_mean": float(yv.mean()),
-                            "y_share_zero": float((yv == 0).mean())
-                        }
-                        if diag_train["y_std"] < 1e-8 and len(yv) >= 8:
-                            LOGGER.warning("[DIAG|TRAIN] Target ist (nahezu) konstant – Flatline-Risiko hoch")
-                        (metadata.setdefault("diagnostics", {})
-                                .setdefault("train", {})
-                                .update(diag_train))
-                    except Exception as _e:
-                        LOGGER.warning(f"[DIAG|TRAIN] übersprungen: {_e}")
+                    # Backtest rechnen (robust, mit Transform-Handling)
+                    backtest_df, residuals_df = self._build_backtest_from_artifact(
+                        artifact=artifact,
+                        X_train=X_train,
+                        y_train=y_train,
+                        dates_train=dates_train,
+                    )
+                    # in Metadaten anhängen
+                    if isinstance(metadata, dict):
+                        metadata["backtest_results"] = backtest_df.to_dict(orient="records")
+                        metadata["backtest_residuals"] = residuals_df.to_dict(orient="records")
 
-                    if X_train is not None and y_train is not None and dates_train is not None:
-                        backtest_results, backtest_residuals = self._generate_backtest_results(
-                            model=artifact.model,
-                            tj=getattr(artifact, "tj", None),
-                            X_train=X_train,
-                            y_train=y_train,
-                            dates_train=dates_train,
-                            n_splits=5
-                        )
-
-                        if isinstance(metadata, dict) and isinstance(backtest_results, pd.DataFrame):
-                            metadata['backtest_results'] = backtest_results.to_dict(orient='records')
-                            if isinstance(backtest_residuals, pd.DataFrame):
-                                metadata['backtest_residuals'] = backtest_residuals.to_dict(orient='records')
-
-                        try:
-                            artifact.metadata['backtest_results'] = backtest_results
-                            artifact.metadata['backtest_residuals'] = backtest_residuals
-                            artifact.save(model_path)
-                        except Exception as _e_save:
-                            LOGGER.warning(f"[Adapter] Konnte Backtest im Artifact nicht speichern: {_e_save}")
-
-                        LOGGER.info("[Adapter] ✓ Backtest-Daten erfolgreich generiert und gespeichert")
-                        LOGGER.info(f"[Backtest] {len(backtest_results)} Vorhersagen, {len(backtest_residuals)} Residuen")
-
-                        try:
-                            bt = backtest_results.copy()
-                            share_zero_pred = float((bt['predicted'].astype(float) == 0).mean()) if 'predicted' in bt.columns else 0.0
-                            flat_pred = False
-                            if 'predicted' in bt.columns and len(bt) >= 2:
-                                flat_pred = bool(bt['predicted'].astype(float).std(ddof=1) < 1e-8)
-                            (metadata.setdefault("diagnostics", {})
-                                    .setdefault("backtest", {})
-                                    .update({
-                                        "share_zero_pred": share_zero_pred,
-                                        "flat_pred": flat_pred,
-                                        "n_points": int(len(bt))
-                                    }))
-                            if share_zero_pred > 0.3 or flat_pred:
-                                LOGGER.warning(f"[DIAG|BACKTEST] Auffällig: {share_zero_pred:.0%} der historischen "
-                                            f"Vorhersagen sind exakt 0 oder nahezu konstant")
-                        except Exception as _e:
-                            LOGGER.warning(f"[DIAG|BACKTEST] übersprungen: {_e}")
-                    else:
-                        LOGGER.warning("[Adapter] Training-Daten nicht verfügbar für Backtest")
                 else:
-                    LOGGER.warning("[Adapter] Model-Artifact nicht gefunden für Backtest")
+                    LOGGER.warning("[Backtest] Kein gespeichertes Modell gefunden – Backtest entfällt.")
             except Exception as e_bt:
-                LOGGER.warning(f"[Adapter] Backtest-Generierung fehlgeschlagen: {e_bt}")
-
-            # 9) Ergebnis-Log
-            LOGGER.info(_sym("\n[Adapter] Pipeline erfolgreich:"))
-            if isinstance(forecast_df, pd.DataFrame) and not forecast_df.empty:
-                try:
-                    LOGGER.info(f"  Prognose: {forecast_df['Forecast'].values}")
-                    for level in confidence_levels:
-                        if f'yhat_lower_{level}' in forecast_df.columns:
-                            lower = forecast_df[f'yhat_lower_{level}'].values
-                            upper = forecast_df[f'yhat_upper_{level}'].values
-                            LOGGER.info(f"  {level}% CI: [{lower[0]:.2f}, {upper[0]:.2f}] ... [{lower[-1]:.2f}, {upper[-1]:.2f}]")
-                except Exception:
-                    pass
-
-            if isinstance(metadata, dict):
-                best = metadata.get("best_params", {})
-                cv = metadata.get("cv_performance", {})
-                LOGGER.info(f"  → Beste Parameter: {best}")
-                if cv:
-                    LOGGER.info(f"  → CV-RMSE: {cv.get('cv_rmse', cv.get('rmse', 'n/a'))}")
-                mc = metadata.get("model_complexity", {})
-                if mc:
-                    LOGGER.info(f"  → {mc.get('n_features', 'n/a')} Features")
-                if 'backtest_results' in metadata:
-                    bt_len = len(metadata['backtest_results']) if isinstance(metadata['backtest_results'], list) else 0
-                    LOGGER.info(f"  → Backtest: {bt_len} historische Vorhersagen verfügbar")
+                LOGGER.warning(f"[Backtest] Fehler bei Backtest-Erstellung: {e_bt}")
 
             return forecast_df, metadata
 
         except Exception as e:
-            LOGGER.exception(f"[Adapter] FEHLER: {e}")
+            LOGGER.exception(f"[Adapter] RUN_FORECAST fehlgeschlagen: {e}")
             raise
-
         finally:
-            if temp_excel:
-                try:
-                    Path(temp_excel).unlink(missing_ok=True)
-                except Exception:
-                    try:
-                        os.remove(temp_excel)
-                    except Exception:
-                        pass
+            # Aufräumen (temp Excel)
+            try:
+                if temp_excel and os.path.exists(temp_excel):
+                    os.remove(temp_excel)
+            except Exception:
+                pass
+
+    
+    # def run_forecast(
+    #     self,
+    #     target: str,
+    #     selected_exog: List[str],
+    #     horizon: int,
+    #     use_cached: bool,
+    #     force_retrain: bool,
+    #     use_flows: bool = False,
+    #     confidence_levels: List[int] = None,
+    #     preload_model_path: Optional[str] = None,
+    # ):
+    #     """
+    #     Führt Forecast durch mit Konfidenzintervallen und Backtest-Generierung.
+    #     (mit Punkt A: Exog-Resolve + Guards + Polling auf Exog-Verfügbarkeit)
+    #     """
+    #     if confidence_levels is None:
+    #         confidence_levels = [80, 95]
+
+    #     LOGGER.info(_sym("\n[Adapter] ===== RUN FORECAST ====="))
+    #     LOGGER.info(f"[Adapter] Target: {target} | Horizon: {horizon} | use_cached={use_cached} | force_retrain={force_retrain}")
+    #     LOGGER.info(f"[Adapter] Selected exog ({len(selected_exog)}): {selected_exog}")
+    #     LOGGER.info(f"[Adapter] use_flows={use_flows}")
+    #     LOGGER.info(f"[Adapter] confidence_levels={confidence_levels}")
+
+    #     self.pipeline_info["ui_target"] = target
+
+    #     temp_excel: Optional[str] = None
+    #     try:
+    #         # --- B) Warten bis Exogs verfügbar sind (falls Loader asynchron arbeitet) --------
+    #         # Hooks (optional):
+    #         #   - self.fetch_exogs(codes: list[str]) -> None   : stößt Download an
+    #         #   - self.get_exog_data() -> pd.DataFrame | None  : liefert aktuellen Exog-Frame
+    #         #   - self.exog_data                                : DataFrame im Adapter
+    #         try:
+    #             import time
+    #             requested = list(selected_exog or [])
+    #             LOGGER.info(f"[Adapter] requested_exog={requested}")
+
+    #             def _get_exog_df():
+    #                 if hasattr(self, "get_exog_data") and callable(getattr(self, "get_exog_data")):
+    #                     return self.get_exog_data()
+    #                 return getattr(self, "exog_data", None) if hasattr(self, "exog_data") else None
+
+    #             def _has_any_requested(dfx: Optional[pd.DataFrame], codes: list[str]) -> bool:
+    #                 if not isinstance(dfx, pd.DataFrame) or dfx.empty or not codes:
+    #                     return False
+    #                 cs = {str(c) for c in dfx.columns}
+    #                 for code in codes:
+    #                     if (code in cs) or (f"{code}__last" in cs) or (f"{code}__last__" in cs):
+    #                         return True
+    #                 return False
+
+    #             cur_exog_df = _get_exog_df()
+    #             if isinstance(cur_exog_df, pd.DataFrame):
+    #                 LOGGER.info(f"[Adapter|Exog] Frame: shape={cur_exog_df.shape}")
+    #                 LOGGER.info(f"[Adapter] exog_data.columns (Top): {list(cur_exog_df.columns[:5])}")
+    #             else:
+    #                 LOGGER.info("[Adapter|Exog] Frame: None")
+
+    #             need_exog = bool(requested)
+    #             have_exog_now = _has_any_requested(cur_exog_df, requested)
+
+    #             if need_exog and not have_exog_now:
+    #                 # Download (best effort) anstoßen
+    #                 if hasattr(self, "fetch_exogs") and callable(getattr(self, "fetch_exogs")):
+    #                     try:
+    #                         self.fetch_exogs(requested)
+    #                     except Exception as _e_fetch:
+    #                         LOGGER.warning(f"[Adapter|Exog] fetch_exogs() Fehler/kein Hook: {_e_fetch}")
+
+    #                 # Kurzes Polling-Fenster
+    #                 max_wait_sec = 12.0
+    #                 poll_sec = 0.3
+    #                 t0 = time.time()
+    #                 while time.time() - t0 < max_wait_sec and not have_exog_now:
+    #                     time.sleep(poll_sec)
+    #                     cur_exog_df = _get_exog_df()
+    #                     have_exog_now = _has_any_requested(cur_exog_df, requested)
+
+    #                 if have_exog_now:
+    #                     LOGGER.info("[Adapter|Exog] Exogs verfügbar – fahre mit Datenaufbereitung fort.")
+    #                 else:
+    #                     LOGGER.warning("[Adapter|Exog] Timeout: Exogs noch nicht verfügbar – fahre ohne Exogene fort.")
+    #         except Exception as _e_wait:
+    #             LOGGER.warning(f"[Adapter|Exog] Wait-Block übersprungen: {_e_wait}")
+
+    #         # 1) Daten vorbereiten (MS, kein Backfill) – erst NACH dem Wait-Block!
+    #         prepared_df = self.prepare_pipeline_data(
+    #             target=target,
+    #             selected_exog=selected_exog,
+    #             use_flows=use_flows,
+    #             horizon_quarters=int(horizon or 0),
+    #         )
+
+    #         # ---- 1a) Resolve & Filter der Exogs im DataFrame (sanft, nicht abbrechen) ----
+    #         def _resolve_exogs_in_df(df: pd.DataFrame, requested: List[str]) -> tuple[list[str], dict]:
+    #             cols_set = {str(c) for c in df.columns}
+    #             variants_map = self._expand_exog_variants(requested or [])
+    #             resolved_list: list[str] = []
+    #             resolved_map: dict[str, str] = {}
+    #             missing: list[str] = []
+    #             for req, cands in variants_map.items():
+    #                 match = next((c for c in cands if c in cols_set), None)
+    #                 if match is None:
+    #                     missing.append(req)
+    #                 else:
+    #                     resolved_map[req] = match
+    #                     resolved_list.append(match)
+    #             return resolved_list, {"missing": missing, "mapping": resolved_map}
+
+    #         resolved_exogs, diag_resolve = _resolve_exogs_in_df(prepared_df, list(selected_exog or []))
+    #         if diag_resolve["missing"]:
+    #             LOGGER.warning(
+    #                 "[Guard] Einige gewünschte Exogs fehlen im DataFrame und werden herausgefiltert: "
+    #                 + ", ".join(diag_resolve["missing"])
+    #             )
+    #         if resolved_exogs:
+    #             LOGGER.info(f"[Guard] Exogs im DF aufgelöst: {diag_resolve['mapping']}")
+    #         else:
+    #             LOGGER.warning("[Guard] Keine Exogs im DF auflösbar – Forecast läuft ohne Exogene weiter.")
+
+    #         # Für die nachfolgenden Schritte merken
+    #         self.pipeline_info["exog_cols"] = list(resolved_exogs)
+
+    #         # 1b) DF-Guard (non-strict: nur Hinweis/Logging, kein Abbruch)
+    #         try:
+    #             self._validate_exog_presence_in_df(
+    #                 df_final=prepared_df,
+    #                 selected_exog=list(selected_exog or []),
+    #                 strict=False,   # wegen vorigem Filter absichtlich nicht strikt
+    #                 logger=LOGGER,
+    #             )
+    #         except Exception as e_guard_df:
+    #             LOGGER.warning(f"[Guard/DF] (non-strict) Hinweis: {e_guard_df}")
+
+    #         # 2) Excel erzeugen
+    #         temp_excel = self.create_temp_excel(prepared_df)
+
+    #         # 2a) Excel-Guard gegen die **gefilterten** Exogs (strict=True)
+    #         try:
+    #             self._validate_exog_presence_in_excel(
+    #                 excel_path=temp_excel,
+    #                 selected_exog=list(resolved_exogs),  # nur die wirklich vorhandenen
+    #                 sheet_name="final_dataset",
+    #                 strict=True,
+    #                 logger=LOGGER,
+    #             )
+    #         except Exception as e_guard_xlsx:
+    #             LOGGER.error(f"[Guard/Excel] Validierung fehlgeschlagen: {e_guard_xlsx}")
+    #             raise
+
+    #         # 3) Config bauen – mit den **effektiv** vorhandenen Exogs
+    #         used_exog = list(self.pipeline_info.get("exog_cols") or [])
+    #         cfg = self._build_config(
+    #             excel_path=temp_excel,
+    #             horizon=horizon,
+    #             use_cached=use_cached,
+    #             selected_exog=used_exog,
+    #         )
+
+    #         # 3a) Optional: Vorgegebenes Modell aus Preset nutzen (PKL-Reuse)
+    #         try:
+    #             if preload_model_path and os.path.exists(preload_model_path):
+    #                 exp_path = get_model_filepath(cfg)
+    #                 try:
+    #                     art_pre = ModelArtifact.load(preload_model_path)
+    #                     ok, issues = art_pre.is_compatible(cfg)
+    #                 except Exception as _e_pre:
+    #                     ok, issues = False, [f'Preload-Ladefehler: {_e_pre}']
+    #                 if ok:
+    #                     if not os.path.exists(exp_path):
+    #                         import shutil
+    #                         Path(exp_path).parent.mkdir(parents=True, exist_ok=True)
+    #                         shutil.copy2(preload_model_path, exp_path)
+    #                     LOGGER.info(f"[Adapter] ✓ Preloaded Modell übernommen: {preload_model_path} → {exp_path}")
+    #                 else:
+    #                     LOGGER.warning(f"[Adapter] Preloaded Modell inkompatibel, retrain nötig. Gründe: {issues}")
+    #         except Exception as _e_pl:
+    #             LOGGER.warning(f"[Adapter] Konnte Preload-PKL nicht verwenden: {_e_pl}")
+
+    #         # Kurze Config-Zusammenfassung
+    #         LOGGER.info("\n[Adapter] Config summary:")
+    #         dbg_keys = [
+    #             "forecast_horizon", "agg_method_target", "agg_methods_exog", "exog_month_lags",
+    #             "target_lags_q", "add_trend_features", "trend_degree", "add_seasonality",
+    #             "future_exog_strategy", "target_transform", "target_standardize",
+    #         ]
+    #         for k in dbg_keys:
+    #             LOGGER.info(f"  {k}: {getattr(cfg, k, None)}")
+    #         LOGGER.info(f"  Excel: {cfg.excel_path}")
+    #         LOGGER.info(f"  Model dir: {cfg.model_dir}")
+    #         LOGGER.info(f"  selected_exog/exog_cols: {getattr(cfg, 'selected_exog', [])}")
+
+    #         # 4) Cache-Check bzgl. Exog-Änderungen
+    #         model_path = get_model_filepath(cfg)
+    #         if ModelArtifact and hasattr(ModelArtifact, "exists") and ModelArtifact.exists(model_path):
+    #             try:
+    #                 art = ModelArtifact.load(model_path)
+    #                 old_exogs = set(art.metadata.get("exog_cols", []))
+    #                 cur_exogs = set(getattr(cfg, "selected_exog", []))
+    #                 if old_exogs and (old_exogs != cur_exogs):
+    #                     LOGGER.warning("\n[Cache] Feature-Mismatch:")
+    #                     LOGGER.warning(f"  Gecacht: {old_exogs}")
+    #                     LOGGER.warning(f"  Aktuell: {cur_exogs}")
+    #                     LOGGER.warning(f"[Cache] Lösche alten Cache: {model_path}")
+    #                     try:
+    #                         os.remove(model_path)
+    #                     except Exception as _e_rm:
+    #                         LOGGER.warning(f"[Cache] Konnte Cache nicht löschen: {_e_rm}")
+    #                     force_retrain = True
+    #             except Exception as _e_load:
+    #                 LOGGER.warning(f"[Cache] Konnte Cache nicht prüfen: {_e_load}")
+
+    #         # 5) Pipeline ausführen
+    #         LOGGER.info(_sym("\n[Adapter] Starte Pipeline."))
+    #         LOGGER.info(f"  Cache: {'verwendet' if use_cached else 'ignoriere'}")
+    #         LOGGER.info(f"  Force-Retrain: {force_retrain}")
+    #         forecast_df, metadata = run_production_pipeline(cfg, force_retrain)
+
+    #         # 6) Modellpfad + Snapshot persistieren
+    #         model_path = get_model_filepath(cfg)
+    #         if isinstance(metadata, dict):
+    #             metadata["model_path"] = model_path
+    #             metadata["confidence_levels"] = confidence_levels
+
+    #         snapshot_dir = Path(getattr(cfg, "output_dir", "outputs"))
+    #         snapshot_dir.mkdir(parents=True, exist_ok=True)
+    #         snapshot_path = snapshot_dir / f"snapshot_{Path(model_path).stem}.parquet"
+    #         try:
+    #             prepared_df.to_parquet(snapshot_path)
+    #             if isinstance(metadata, dict):
+    #                 metadata["exog_snapshot_path"] = str(snapshot_path)
+    #         except Exception as _e_pq:
+    #             LOGGER.warning(f"[Adapter] Snapshot konnte nicht geschrieben werden: {_e_pq}")
+
+    #         # 7) Residuen extrahieren & CIs hinzufügen
+    #         try:
+    #             LOGGER.info(_sym("\n[Adapter] Berechne Konfidenzintervalle"))
+    #             residuals = self._extract_residuals_from_pipeline(metadata, model_path)
+
+    #             if residuals is None or (isinstance(residuals, (list, np.ndarray, pd.Series)) and len(residuals) == 0):
+    #                 cv_rmse = None
+    #                 try:
+    #                     cv_perf = (metadata or {}).get("cv_performance", {})
+    #                     cv_rmse = float(cv_perf.get("cv_rmse") or cv_perf.get("rmse"))
+    #                 except Exception:
+    #                     pass
+    #                 if cv_rmse and np.isfinite(cv_rmse):
+    #                     LOGGER.warning(f"[CI] Keine Residuen gefunden – erzeuge synthetische Residuen (RMSE={cv_rmse:.4f}, n=100)")
+    #                     rng = np.random.default_rng(42)
+    #                     residuals = rng.normal(0.0, cv_rmse, size=100)
+    #                 else:
+    #                     LOGGER.warning("[CI] Keine Residuen verfügbar und kein CV-RMSE – CI werden übersprungen")
+    #                     residuals = None
+
+    #             if residuals is not None:
+    #                 forecast_df = self._add_confidence_intervals_to_forecast(
+    #                     forecast_df=forecast_df,
+    #                     residuals=residuals,
+    #                     confidence_levels=confidence_levels,
+    #                     forecast_col="Forecast"
+    #                 )
+    #                 if isinstance(metadata, dict):
+    #                     try:
+    #                         res_arr = np.asarray(residuals, dtype=float)
+    #                         if res_arr.size > 1:
+    #                             se = float(np.std(res_arr, ddof=1))
+    #                             metadata["ci_std_error"] = se
+    #                             metadata.setdefault("diagnostics", {}).setdefault("ci", {})["std_error"] = se
+    #                     except Exception:
+    #                         pass
+
+    #                 LOGGER.info(f"[CI] Konfidenzintervalle erfolgreich hinzugefügt")
+    #                 LOGGER.info(f"[CI] Forecast-Spalten: {forecast_df.columns.tolist()}")
+
+    #         except Exception as e_ci:
+    #             LOGGER.error(f"[CI] Fehler bei Konfidenzintervall-Berechnung: {e_ci}")
+    #             LOGGER.warning("[CI] Forecast wird ohne Konfidenzintervalle zurückgegeben")
+
+    #         # --- OUTPUT DIAGNOSTICS: Forecast-Flatline -------------------------
+    #         try:
+    #             yhat = None
+    #             for c in ["Forecast", "yhat", "y_pred"]:
+    #                 if c in forecast_df.columns:
+    #                     yhat = forecast_df[c].astype(float)
+    #                     break
+    #             if yhat is not None and len(yhat) >= 2:
+    #                 std_yhat = float(yhat.std(ddof=1))
+    #                 mean_yhat = float(yhat.mean())
+    #                 flat = std_yhat < 1e-8
+    #                 (metadata.setdefault("diagnostics", {})
+    #                         .setdefault("forecast", {})
+    #                         .update({"std": std_yhat, "mean": mean_yhat, "is_flatline": flat}))
+    #                 if flat:
+    #                     LOGGER.warning("[DIAG|FORECAST] Prognose ist (nahezu) konstant – mögliche Ursachen: "
+    #                                 "degenerates Target/Features, starke Regularisierung oder fehlerhafte Transformation")
+    #         except Exception as _e:
+    #             LOGGER.warning(f"[DIAG|FORECAST] übersprungen: {_e}")
+
+    #         # 8) Backtest – unverändert
+    #         try:
+    #             LOGGER.info("[Adapter] Generiere Backtest-Daten...")
+    #             if ModelArtifact and hasattr(ModelArtifact, 'exists') and ModelArtifact.exists(model_path):
+    #                 artifact = ModelArtifact.load(model_path)
+    #                 X_train = artifact.metadata.get('X_train')
+    #                 y_train = artifact.metadata.get('y_train')
+    #                 dates_train = artifact.metadata.get('dates_train')
+
+    #                 if X_train is None or y_train is None or dates_train is None:
+    #                     LOGGER.info("[Backtest] Training-Daten nicht in Artifact, extrahiere aus prepared_df")
+    #                     from forecaster_pipeline import (aggregate_to_quarter, add_deterministic_features, build_quarterly_lags)
+    #                     df_in = prepared_df.copy()
+    #                     if cfg is not None:
+    #                         rename_map = {}
+    #                         if 'date' in df_in.columns and getattr(cfg, "date_col", "date") not in df_in.columns:
+    #                             rename_map['date'] = cfg.date_col
+    #                         if 'target_value' in df_in.columns and getattr(cfg, "target_col", "target") not in df_in.columns:
+    #                             rename_map['target_value'] = cfg.target_col
+    #                         if rename_map:
+    #                             df_in = df_in.rename(columns=rename_map)
+    #                     df_q = aggregate_to_quarter(df_in, cfg)
+    #                     df_q = add_deterministic_features(df_q, cfg)
+    #                     df_feats = build_quarterly_lags(df_q, cfg)
+
+    #                     X_cols = artifact.X_cols
+    #                     X_train = df_feats[X_cols]
+    #                     y_train = df_feats[cfg.target_col]
+    #                     if 'Q_end' in df_feats.columns:
+    #                         dates_train = df_feats['Q_end']
+    #                     elif 'Q' in df_feats.columns:
+    #                         dates_train = df_feats['Q']
+    #                     else:
+    #                         dates_train = df_feats.index
+
+    #                 try:
+    #                     yv = pd.Series(y_train).astype(float)
+    #                     diag_train = {
+    #                         "y_std": float(yv.std(ddof=1)) if len(yv) > 1 else 0.0,
+    #                         "y_mean": float(yv.mean()),
+    #                         "y_share_zero": float((yv == 0).mean())
+    #                     }
+    #                     if diag_train["y_std"] < 1e-8 and len(yv) >= 8:
+    #                         LOGGER.warning("[DIAG|TRAIN] Target ist (nahezu) konstant – Flatline-Risiko hoch")
+    #                     (metadata.setdefault("diagnostics", {})
+    #                             .setdefault("train", {})
+    #                             .update(diag_train))
+    #                 except Exception as _e:
+    #                     LOGGER.warning(f"[DIAG|TRAIN] übersprungen: {_e}")
+
+    #                 if X_train is not None and y_train is not None and dates_train is not None:
+    #                     backtest_results, backtest_residuals = self._generate_backtest_results(
+    #                         model=artifact.model,
+    #                         tj=getattr(artifact, "tj", None),
+    #                         X_train=X_train,
+    #                         y_train=y_train,
+    #                         dates_train=dates_train,
+    #                         n_splits=5
+    #                     )
+
+    #                     if isinstance(metadata, dict) and isinstance(backtest_results, pd.DataFrame):
+    #                         metadata['backtest_results'] = backtest_results.to_dict(orient='records')
+    #                         if isinstance(backtest_residuals, pd.DataFrame):
+    #                             metadata['backtest_residuals'] = backtest_residuals.to_dict(orient='records')
+
+    #                     try:
+    #                         artifact.metadata['backtest_results'] = backtest_results
+    #                         artifact.metadata['backtest_residuals'] = backtest_residuals
+    #                         artifact.save(model_path)
+    #                     except Exception as _e_save:
+    #                         LOGGER.warning(f"[Adapter] Konnte Backtest im Artifact nicht speichern: {_e_save}")
+
+    #                     LOGGER.info("[Adapter] ✓ Backtest-Daten erfolgreich generiert und gespeichert")
+    #                     LOGGER.info(f"[Backtest] {len(backtest_results)} Vorhersagen, {len(backtest_residuals)} Residuen")
+
+    #                     try:
+    #                         bt = backtest_results.copy()
+    #                         share_zero_pred = float((bt['predicted'].astype(float) == 0).mean()) if 'predicted' in bt.columns else 0.0
+    #                         flat_pred = False
+    #                         if 'predicted' in bt.columns and len(bt) >= 2:
+    #                             flat_pred = bool(bt['predicted'].astype(float).std(ddof=1) < 1e-8)
+    #                         (metadata.setdefault("diagnostics", {})
+    #                                 .setdefault("backtest", {})
+    #                                 .update({
+    #                                     "share_zero_pred": share_zero_pred,
+    #                                     "flat_pred": flat_pred,
+    #                                     "n_points": int(len(bt))
+    #                                 }))
+    #                         if share_zero_pred > 0.3 or flat_pred:
+    #                             LOGGER.warning(f"[DIAG|BACKTEST] Auffällig: {share_zero_pred:.0%} der historischen "
+    #                                         f"Vorhersagen sind exakt 0 oder nahezu konstant")
+    #                     except Exception as _e:
+    #                         LOGGER.warning(f"[DIAG|BACKTEST] übersprungen: {_e}")
+    #                 else:
+    #                     LOGGER.warning("[Adapter] Training-Daten nicht verfügbar für Backtest")
+    #             else:
+    #                 LOGGER.warning("[Adapter] Model-Artifact nicht gefunden für Backtest")
+    #         except Exception as e_bt:
+    #             LOGGER.warning(f"[Adapter] Backtest-Generierung fehlgeschlagen: {e_bt}")
+
+    #         # 9) Ergebnis-Log
+    #         LOGGER.info(_sym("\n[Adapter] Pipeline erfolgreich:"))
+    #         if isinstance(forecast_df, pd.DataFrame) and not forecast_df.empty:
+    #             try:
+    #                 LOGGER.info(f"  Prognose: {forecast_df['Forecast'].values}")
+    #                 for level in confidence_levels:
+    #                     if f'yhat_lower_{level}' in forecast_df.columns:
+    #                         lower = forecast_df[f'yhat_lower_{level}'].values
+    #                         upper = forecast_df[f'yhat_upper_{level}'].values
+    #                         LOGGER.info(f"  {level}% CI: [{lower[0]:.2f}, {upper[0]:.2f}] ... [{lower[-1]:.2f}, {upper[-1]:.2f}]")
+    #             except Exception:
+    #                 pass
+
+    #         if isinstance(metadata, dict):
+    #             best = metadata.get("best_params", {})
+    #             cv = metadata.get("cv_performance", {})
+    #             LOGGER.info(f"  → Beste Parameter: {best}")
+    #             if cv:
+    #                 LOGGER.info(f"  → CV-RMSE: {cv.get('cv_rmse', cv.get('rmse', 'n/a'))}")
+    #             mc = metadata.get("model_complexity", {})
+    #             if mc:
+    #                 LOGGER.info(f"  → {mc.get('n_features', 'n/a')} Features")
+    #             if 'backtest_results' in metadata:
+    #                 bt_len = len(metadata['backtest_results']) if isinstance(metadata['backtest_results'], list) else 0
+    #                 LOGGER.info(f"  → Backtest: {bt_len} historische Vorhersagen verfügbar")
+
+    #         return forecast_df, metadata
+
+    #     except Exception as e:
+    #         LOGGER.exception(f"[Adapter] FEHLER: {e}")
+    #         raise
+
+    #     finally:
+    #         if temp_excel:
+    #             try:
+    #                 Path(temp_excel).unlink(missing_ok=True)
+    #             except Exception:
+    #                 try:
+    #                     os.remove(temp_excel)
+    #                 except Exception:
+    #                     pass
 
 
     # ------------------------------------------------------------

@@ -2779,8 +2779,36 @@ def create_forecast_layout():
                 dbc.Badge("Pipeline", color="success", className="ms-2")
             ]),
             dbc.CardBody([
+                # Responsive: XS=12 (stacked), LG=5 Spalten mit angepassten Breiten
                 dbc.Row([
-                    # Zielvariable + Datenmodus + Horizon + Backtest-Schalter
+                    # (1) Sektor + Toggles  -> normal
+                    dbc.Col([
+                        dbc.Label("Sektor", className="fw-bold mb-2"),
+                        dcc.Dropdown(
+                            id="forecast-sektor-dropdown",
+                            options=[
+                                {"label": "Private Haushalte (PH)", "value": "PH"},
+                                {"label": "Nichtfinanzielle Unternehmen (NFK)", "value": "NFK"},
+                            ],
+                            value="PH",
+                            clearable=False,
+                            className="mb-3"
+                        ),
+                        dbc.Switch(
+                            id="forecast-datenmodus-switch",
+                            label="Flussdaten verwenden",
+                            value=True,
+                            className="mb-2"
+                        ),
+                        dbc.Switch(
+                            id="show-backtest-switch",
+                            label="Historische Vorhersagen",
+                            value=False,
+                            className="mt-2"
+                        ),
+                    ], width={"xs": 12, "lg": 2}, className="mb-3"),
+
+                    # (2) Zielvariable + Prognosehorizont  -> schmaler
                     dbc.Col([
                         dbc.Label("Zielvariable", className="fw-bold mb-2"),
                         dcc.Dropdown(
@@ -2796,7 +2824,6 @@ def create_forecast_layout():
                             clearable=False,
                             className="mb-3"
                         ),
-
                         dbc.Label("Prognosehorizont", className="fw-bold mb-2"),
                         html.Div([
                             dbc.ButtonGroup([
@@ -2807,24 +2834,10 @@ def create_forecast_layout():
                                 dbc.Button("6Q", id={"type": "horizon-btn", "value": 6},
                                            outline=True, color="primary", size="sm"),
                             ], className="w-100 mb-2"),
-                        ], className="px-2"),
+                        ], className="px-2")
+                    ], width={"xs": 12, "lg": 2}, className="mb-3"),
 
-                        dbc.Switch(
-                            id="forecast-datenmodus-switch",
-                            label="Flussdaten verwenden",
-                            value=True,
-                            className="mb-2"
-                        ),
-
-                        dbc.Switch(
-                            id="show-backtest-switch",
-                            label=html.Span(["Historische Vorhersagen "]),
-                            value=False,
-                            className="mt-2"
-                        ),
-                    ], width=2),
-
-                    # Einflussfaktoren
+                    # (3) Einflussfaktoren + Sonder-Serien + Hinzufügen  -> breiter
                     dbc.Col([
                         dbc.Label("Einflussfaktoren", className="fw-bold mb-2"),
                         dcc.Dropdown(
@@ -2834,9 +2847,10 @@ def create_forecast_layout():
                             placeholder="Aus Liste wählen...",
                             className="mb-2"
                         ),
+                        #dbc.Label("Sonder-Serien", className="fw-bold mb-2"),
                         dbc.Input(
                             id="manual-series-input",
-                            placeholder="Oder Serien-ID manuell eingeben (z. B. ICP.M.DE.N...)",
+                            placeholder="Serien-ID manuell eingeben (z. B. ICP.M.DE.N...)",
                             className="mb-2"
                         ),
                         dbc.Button(
@@ -2850,11 +2864,11 @@ def create_forecast_layout():
                             "Ausgewählt werden sowohl Dropdown als auch manuell eingegebene Serien",
                             className="text-muted d-block"
                         )
-                    ], width=4),
+                    ], width={"xs": 12, "lg": 4}, className="mb-3"),
 
-                    # Presets (inkl. Löschen)
+                    # (4) H&C Presets + Caching  -> schmaler
                     dbc.Col([
-                        dbc.Label("H&C Presets", className="fw-bold mb-2"),
+                        dbc.Label("Presets & Caching", className="fw-bold mb-2"),
                         dcc.Dropdown(
                             id="forecast-preset-dropdown",
                             options=[],
@@ -2871,61 +2885,40 @@ def create_forecast_layout():
                                        color="outline-info", size="sm", disabled=True),
                             dbc.Button("Löschen", id="delete-preset-btn",
                                        color="outline-danger", size="sm", disabled=True)
+                        ], className="w-100 mb-3"),
+
+                        #dbc.Label("Caching", className="fw-bold mb-2"),
+
+                        dbc.ButtonGroup([
+                            dbc.Button([html.I(className="bi bi-arrow-clockwise me-1"), "Neu"],
+                                       id="retrain-model-btn", color="outline-warning", size="sm"),
+                            dbc.Button([html.I(className="bi bi-folder me-1"), "Liste"],
+                                       id="show-models-btn", color="outline-info", size="sm")
                         ], className="w-100"),
 
-                        # Delete-Confirm-Modal
-                        dbc.Modal(
-                            [
-                                dbc.ModalHeader(dbc.ModalTitle("Preset löschen")),
-                                dbc.ModalBody(
-                                    id="delete-preset-body",
-                                    children="Ausgewähltes Preset wirklich löschen?"
-                                ),
-                                dbc.ModalFooter([
-                                    dbc.Button("Abbrechen", id="cancel-delete-preset", className="me-2"),
-                                    dbc.Button("Ja, löschen", id="confirm-delete-preset", color="danger")
-                                ])
-                            ],
-                            id="delete-preset-modal",
-                            is_open=False,
-                            centered=True,
-                            backdrop="static",
-                        ),
-                    ], width=2),
-
-                    # Modell Management
-                    dbc.Col([
-                        dbc.Label("Modell", className="fw-bold mb-2"),
                         dbc.Switch(
                             id="model-cache-switch",
                             label="Cache verwenden",
                             value=True,
                             className="mb-2"
                         ),
-                        dbc.ButtonGroup([
-                            dbc.Button([html.I(className="bi bi-arrow-clockwise me-1"), "Neu"],
-                                       id="retrain-model-btn", color="outline-warning", size="sm"),
-                            dbc.Button([html.I(className="bi bi-folder me-1"), "Liste"],
-                                       id="show-models-btn", color="outline-info", size="sm")
-                        ], className="w-100")
-                    ], width=2),
 
-                    # Aktionen
+                    ], width={"xs": 12, "lg": 2}, className="mb-3"),
+
+                    # (5) Aktionen  -> normal
                     dbc.Col([
                         dbc.Label("Aktionen", className="fw-bold mb-2"),
                         dbc.Button([html.I(className="bi bi-graph-up-arrow me-1"), "Prognose erstellen"],
                                    id="create-forecast-btn", color="success", size="lg",
                                    className="w-100 mb-2"),
-
                         dbc.Button([html.I(className="bi bi-download me-1"), "Export"],
                                    id="export-rawdata-btn", color="outline-primary", size="sm",
                                    className="w-100"),
-
                         dbc.Button([html.I(className="bi bi-lightning-charge me-1"), "H&C Presets vorbereiten"],
                                    id="prewarm-hc-presets-btn", color="outline-secondary", size="sm",
                                    className="w-100 mt-2")
-                    ], width=2)
-                ], align="start")
+                    ], width={"xs": 12, "lg": 2}, className="mb-3"),
+                ], align="start", className="g-3")
             ])
         ], className="settings-panel mb-4"),
 
@@ -3075,6 +3068,7 @@ def create_forecast_layout():
         dcc.Store(id="hc-presets-cache-store", data={}),
         dcc.Store(id="forecast-state-store", data={"has_forecast": False}),
     ])
+
 
 
 

@@ -134,6 +134,25 @@ except Exception:
 # BASIS UTILITIES
 # ==============================================================================
 
+
+# --- PATCH: Helper zum Sektor-Filter (GVB-Store JSON -> gefiltertes JSON) ---
+import pandas as pd  # (falls oben noch nicht importiert)
+
+def _filter_gvb_json_by_sektor(gvb_json: str, sektor_value: str) -> str:
+    """Filtert den GVB-Store nach 'sektor' (PH/NFK) und gibt JSON (orient='split') zurück.
+       Fällt robust zurück (ungefiltert), wenn Spalte fehlt oder sektor_value None/leer ist."""
+    try:
+        df = _parse_store_df(gvb_json)
+        if isinstance(df, pd.DataFrame) and not df.empty and "sektor" in df.columns and sektor_value:
+            sekt = str(sektor_value).strip().upper()
+            df = df[df["sektor"].astype(str).str.upper() == sekt].copy()
+        return df.to_json(orient="split", date_format="iso")
+    except Exception:
+        # Safety fallback: liefere das Original zurück, damit der Forecast nicht bricht
+        return gvb_json
+
+
+
 def _parse_store_df(payload) -> pd.DataFrame:
     """
     Robust gegen verschiedene Store-Formate:
@@ -2221,20 +2240,34 @@ import time
     State("forecast-target-dropdown", "value"),
     State("external-exog-dropdown", "value"),
     State("forecast-horizon-store", "data"),
+    # NEU: Sektor & Modus in der Vorschau anzeigen
+    State("forecast-sektor-dropdown", "value"),
+    State("forecast-datenmodus-switch", "value"),
     prevent_initial_call=True,
 )
 def toggle_preset_modal(open_clicks, confirm_clicks, cancel_clicks,
-                        is_open, target_value, exog_values, horizon_quarters):
+                        is_open, target_value, exog_values, horizon_quarters,
+                        sektor_value, is_fluss_mode):
     ctx = dash.callback_context
     if not ctx.triggered:
         raise PreventUpdate
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
 
     if trigger == "save-preset-btn":
+        # hübsche Labels
+        sektor_label = {
+            "PH": "Private Haushalte (PH)",
+            "NFK": "Nichtfinanzielle Unternehmen (NFK)"
+        }.get((sektor_value or "").upper(), str(sektor_value or "—"))
+        modus_label = "Flussdaten" if bool(is_fluss_mode) else "Bestandsdaten"
+        exog_count = len(exog_values or [])
+
         preview = html.Div([
+            html.P([html.Strong("Sektor: "), sektor_label], className="mb-1"),
             html.P([html.Strong("Zielvariable: "), target_value or "Keine"], className="mb-1"),
-            html.P([html.Strong("Einflussfaktoren: "), f"{len(exog_values or [])} ausgewählt"], className="mb-1"),
-            html.P([html.Strong("Prognosehorizont: "), f"{horizon_quarters or 6} Quartale"], className="mb-0"),
+            html.P([html.Strong("Einflussfaktoren: "), f"{exog_count} ausgewählt"], className="mb-1"),
+            html.P([html.Strong("Prognosehorizont: "), f"{horizon_quarters or 6} Quartale"], className="mb-1"),
+            html.P([html.Strong("Datenmodus: "), modus_label], className="mb-0"),
         ])
         return True, preview
 
@@ -2242,7 +2275,6 @@ def toggle_preset_modal(open_clicks, confirm_clicks, cancel_clicks,
         return False, no_update
 
     raise PreventUpdate
-
 
 
 
@@ -2494,51 +2526,63 @@ def apply_preset_to_external_exog(preset_value, target_value):
     
     return []
 
-
 @app.callback(
     Output("forecast-target-dropdown", "value", allow_duplicate=True),
     Output("external-exog-dropdown", "value", allow_duplicate=True),
     Output("model-artifact-store", "data", allow_duplicate=True),
     Output("exog-data-store", "data", allow_duplicate=True),
+    # NEU: Sektor aus Preset zurück in die UI schreiben
+    Output("forecast-sektor-dropdown", "value", allow_duplicate=True),
     Input("load-preset-btn", "n_clicks"),
     State("forecast-preset-dropdown", "value"),
     State("user-presets-store", "data"),
     prevent_initial_call=True
 )
 def load_selected_preset(n_clicks, preset_value, user_presets):
-    """Lädt ausgewähltes Preset vollständig."""
+    """Lädt ausgewähltes Preset vollständig (inkl. Sektor, falls vorhanden)."""
     if not n_clicks or not preset_value or preset_value == "__none__":
         raise dash.exceptions.PreventUpdate
+
+    import os
 
     presets = get_ecb_presets_hydrated()
     target = dash.no_update
     exogs = dash.no_update
     model_payload = dash.no_update
     exog_store_json = dash.no_update
+    sektor_val = dash.no_update  # <- wird gesetzt, wenn im Preset vorhanden
 
-    # ECB-Preset
+    # ---------- ECB-Preset ----------
     if str(preset_value).startswith("preset_"):
         slug = str(preset_value).replace("preset_", "", 1)
         p = presets.get(slug)
         if not p:
             raise dash.exceptions.PreventUpdate
-        
+
+        # Zielvariable
         target = p.get("target") or dash.no_update
+
+        # Exogs (können als dict {name:code} vorliegen)
         exog_dict = p.get("exog")
-        exogs = list(exog_dict.values()) if isinstance(exog_dict, dict) else []
-        
+        exogs = list(exog_dict.values()) if isinstance(exog_dict, dict) else (exog_dict or [])
+
+        # Sektor (falls im Preset mitgegeben: ui_opts.sektor oder direkt sektor)
+        ui_opts = p.get("ui_opts") or {}
+        sektor_val = (ui_opts.get("sektor") if isinstance(ui_opts, dict) else None) or p.get("sektor") or dash.no_update
+
+        # Pfade (Modell & Snapshot)
         data_path = p.get("final_dataset_path") or p.get("exog_snapshot_path")
         mdl_path = p.get("model_path")
-        
+
         if mdl_path or data_path:
             model_payload = {"path": mdl_path, "exog_snapshot_path": data_path}
-        
-        if data_path and os.path.exists(data_path):
-            exog_store_json = _snapshot_to_store_json(data_path, exogs)
-        
-        return target, exogs, model_payload, exog_store_json
 
-    # User-Preset
+        if data_path and os.path.exists(data_path):
+            exog_store_json = _snapshot_to_store_json(data_path, exogs if isinstance(exogs, list) else [])
+
+        return target, exogs, model_payload, exog_store_json, sektor_val
+
+    # ---------- User-Preset ----------
     if str(preset_value).startswith("user_"):
         pid = str(preset_value).replace("user_", "", 1)
         chosen = None
@@ -2546,31 +2590,39 @@ def load_selected_preset(n_clicks, preset_value, user_presets):
             if str(meta.get("id")) == str(pid):
                 chosen = meta
                 break
-        
+
         if not chosen:
             raise dash.exceptions.PreventUpdate
-        
+
+        # Zielvariable & Exogs
         target = chosen.get("target")
         exogs = chosen.get("exog") or []
-        
+
+        # Sektor aus ui_opts, falls gespeichert (siehe extra_ui_options={"sektor": ...})
+        ui_opts = chosen.get("ui_opts") or {}
+        sektor_val = ui_opts.get("sektor") if isinstance(ui_opts, dict) else None
+        if not sektor_val:
+            sektor_val = chosen.get("sektor")  # Fallback, falls anders gespeichert
+        if not sektor_val:
+            sektor_val = dash.no_update
+
+        # Pfade (Modell & Snapshot)
         data_path = chosen.get("final_dataset_path") or chosen.get("exog_snapshot_path")
         mdl_path = chosen.get("model_path")
-        
+
         if mdl_path or data_path:
             model_payload = {"path": mdl_path, "exog_snapshot_path": data_path}
-        
+
         if data_path and os.path.exists(data_path):
-            exog_store_json = _snapshot_to_store_json(data_path, exogs)
-        
-        return target, exogs, model_payload, exog_store_json
+            exog_store_json = _snapshot_to_store_json(data_path, exogs if isinstance(exogs, list) else [])
+
+        return target, exogs, model_payload, exog_store_json, sektor_val
 
     raise dash.exceptions.PreventUpdate
-
 
 # ==============================================================================
 # CALLBACKS - EXPORT
 # ==============================================================================
-
 @app.callback(
     Output("download-rawdata", "data"),
     Input("export-rawdata-btn", "n_clicks"),
@@ -2582,28 +2634,53 @@ def load_selected_preset(n_clicks, preset_value, user_presets):
     State("gvb-data-store", "data"),
     State("exog-data-store", "data"),
     State("model-artifact-store", "data"),
+    # NEU: gewählter Sektor (PH/NFK)
+    State("forecast-sektor-dropdown", "value"),
     prevent_initial_call=True
 )
 def export_forecast_rawdata(
     n_clicks, target_value, horizon_value,
     exog_selection, manual_input,
     forecast_real_switch_value,
-    gvb_json, exog_json, model_artifact_json
-):
-    """Exportiert Forecast-Rohdaten als Excel."""
+    gvb_json, exog_json, model_artifact_json,
+    sektor_value
+    ):
+    """Exportiert Forecast-Rohdaten als Excel – inklusive Sektor-Filter (PH/NFK) & Modus (Bestand/Fluss)."""
     if not n_clicks:
         return no_update
 
-    # Config erstellen
+    import pandas as pd
+    import numpy as np
+
+    # Modus ableiten
+    modus = "fluss" if bool(forecast_real_switch_value) else "bestand"
+
+    # --- Sektor-Filter (GVB-Store) ---
+    def _filter_gvb_json_by_sektor_fallback(gjson: str, sektor: str) -> str:
+        try:
+            df = _parse_store_df(gjson)
+            if isinstance(df, pd.DataFrame) and not df.empty and "sektor" in df.columns and sektor:
+                sekt = str(sektor).strip().upper()
+                df = df[df["sektor"].astype(str).str.upper() == sekt].copy()
+            return df.to_json(orient="split", date_format="iso")
+        except Exception:
+            return gjson
+
+    try:
+        gvb_json_filtered = _filter_gvb_json_by_sektor(gvb_json, sektor_value)  # nutzt globalen Helper, falls vorhanden
+    except Exception:
+        gvb_json_filtered = _filter_gvb_json_by_sektor_fallback(gvb_json, sektor_value)
+
+    # Config erstellen (inkl. Sektor & Modus)
     cfg_rows = [{
         "timestamp": pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
         "target": target_value,
         "horizon_q": horizon_value,
-        "modus": "bestand",
+        "modus": modus,
         "smoothing": 1,
         "start_date": "(auto)",
         "end_date": "(auto)",
-        "sektor": "(default)",
+        "sektor": str(sektor_value or "(default)"),
         "log_transform": False,
         "exog_selection_dropdown": ", ".join(exog_selection) if isinstance(exog_selection, list) else str(exog_selection or ""),
         "exog_manual_input_raw": str(manual_input or ""),
@@ -2611,11 +2688,11 @@ def export_forecast_rawdata(
     }]
     config_df = pd.DataFrame(cfg_rows)
 
-    # GVB-Daten laden
-    gvb_df = _parse_store_df(gvb_json)
+    # GVB-Daten laden (bereits sektorgefiltert)
+    gvb_df = _parse_store_df(gvb_json_filtered)
     if gvb_df.empty or "date" not in gvb_df.columns:
         config_df.loc[0, "status"] = "Fehler"
-        config_df.loc[0, "msg"] = "GVB-Daten fehlen oder 'date' ist nicht vorhanden."
+        config_df.loc[0, "msg"] = "GVB-Daten fehlen (nach Sektor-Filter) oder 'date' ist nicht vorhanden."
         xbytes = _make_export_bytes(config_df, pd.DataFrame(), pd.DataFrame(), _parse_store_df(exog_json))
         return dcc.send_bytes(lambda b: b.write(xbytes), "forecast_export_error.xlsx")
 
@@ -2630,7 +2707,7 @@ def export_forecast_rawdata(
     
     if gvb_df.empty:
         config_df.loc[0, "status"] = "Fehler"
-        config_df.loc[0, "msg"] = "Alle Datumswerte sind ungültig."
+        config_df.loc[0, "msg"] = "Alle Datumswerte sind ungültig (nach Sektor-Filter)."
         xbytes = _make_export_bytes(config_df, pd.DataFrame(), pd.DataFrame(), _parse_store_df(exog_json))
         return dcc.send_bytes(lambda b: b.write(xbytes), "forecast_export_error.xlsx")
 
@@ -2640,30 +2717,31 @@ def export_forecast_rawdata(
     config_df.loc[0, "start_date"] = str(start_date)
     config_df.loc[0, "end_date"] = str(end_date)
 
-    # Haupttabelle erstellen
+    # Haupttabelle erstellen (mit Modus & Sektor)
     main_df = _build_main_e1_table_from_store(
         gvb_df,
-        data_type="bestand",
+        data_type=modus,                   # "bestand" oder "fluss"
         start_date=str(start_date),
         end_date=str(end_date),
         smoothing=1,
         use_log=False,
-        sektor=None
+        sektor=sektor_value               # <- NEU: Sektor durchreichen
     )
 
-    # Current View erstellen
+    # Current View erstellen (je nach Modus auf 'bestand' oder 'fluss' aggregieren)
+    value_col = "fluss" if modus == "fluss" else "bestand"
     view = (
         gvb_df[(gvb_df["date"] >= pd.Timestamp(start_date)) & (gvb_df["date"] <= pd.Timestamp(end_date))]
-        .groupby(["date", "ebene1"], dropna=False)["bestand"]
+        .groupby(["date", "ebene1"], dropna=False)[value_col]
         .sum()
         .reset_index()
-        .pivot(index="date", columns="ebene1", values="bestand")
+        .pivot(index="date", columns="ebene1", values=value_col)
         .sort_index()
         .fillna(0.0)
     )
     current_view_df = view if not view.empty else pd.DataFrame()
 
-    # Exog-Daten laden
+    # Exog-Daten laden (unverändert)
     exog_df = _parse_store_df(exog_json)
     if not exog_df.empty:
         for c in ["date", "Date", "DATE", "time", "Time"]:
@@ -2682,9 +2760,8 @@ def export_forecast_rawdata(
         exog_df=exog_df
     )
     
-    filename = f"forecast_export_{pd.Timestamp.today().strftime('%Y-%m-%d')}.xlsx"
+    filename = f"forecast_export_{sektor_value or 'NA'}_{modus}_{pd.Timestamp.today().strftime('%Y-%m-%d')}.xlsx"
     return dcc.send_bytes(lambda b: b.write(xbytes), filename)
-
 
 # ==============================================================================
 # CALLBACKS - MANUELLE SERIEN & ECB DOWNLOAD
@@ -2960,50 +3037,82 @@ def prewarm_hc_presets(n_clicks, gvb_json, exog_store_json):
         State("gvb-data-store", "data"),
         State("forecast-state-store", "data"),
         State("forecast-horizon-store", "data"),
+        # NEU: gewählter Sektor (PH/NFK)
+        State("forecast-sektor-dropdown", "value"),
     ],
     prevent_initial_call='initial_duplicate',
 )
 def show_initial_forecast_history(
     pathname, target, is_fluss_mode,
-    gvb_json, fc_state, horizon
-):
-    """
-    Zeigt historische Daten beim ersten Laden mit reserviertem Platz für Forecast.
-    X-Achse bleibt stabil, wenn später Forecast hinzugefügt wird.
-    Backtest-Einstellungen: initial immer aus, Modus fest auf 'overlay'.
-    """
-    if pathname != "/forecast":
-        raise PreventUpdate
+    gvb_json, fc_state, horizon, sektor_value
+    ):
+        """
+        Zeigt historische Daten beim ersten Laden mit reserviertem Platz für Forecast.
+        Berücksichtigt den gewählten Sektor (PH/NFK), indem der GVB-Store vorab gefiltert wird.
+        X-Achse bleibt stabil, wenn später Forecast hinzugefügt wird.
+        Backtest-Einstellungen: initial immer aus, Modus fest auf 'overlay'.
+        """
+        import pandas as pd
+        from dash.exceptions import PreventUpdate
 
-    ctx = dash.callback_context
-    if ctx.triggered:
-        triggered_id = ctx.triggered[0]["prop_id"].split(".")[0]
-        # Wenn bereits eine Prognose existiert und das Laden nur durch URL kam → keine Neu-Zeichnung
-        if isinstance(fc_state, dict) and fc_state.get("has_forecast") and triggered_id == "url":
+        # Fallback-Filter, falls der globale Helper nicht importiert/definiert ist
+        def _filter_gvb_json_by_sektor_fallback(gjson: str, sektor: str) -> str:
+            try:
+                df = _parse_store_df(gjson)  # vorhandener App-Helper
+                if isinstance(df, pd.DataFrame) and not df.empty and "sektor" in df.columns and sektor:
+                    sekt = str(sektor).strip().upper()
+                    df = df[df["sektor"].astype(str).str.upper() == sekt].copy()
+                return df.to_json(orient="split", date_format="iso")
+            except Exception:
+                return gjson
+
+        if pathname != "/forecast":
             raise PreventUpdate
 
-    if not gvb_json:
-        return _empty_forecast_fig("Lade GVB-Daten...")
+        ctx = dash.callback_context
+        if ctx.triggered:
+            triggered_id = ctx.triggered[0]["prop_id"].split(".")[0]
+            # Wenn bereits eine Prognose existiert und das Laden nur durch URL kam → keine Neu-Zeichnung
+            if isinstance(fc_state, dict) and fc_state.get("has_forecast") and triggered_id == "url":
+                raise PreventUpdate
 
-    try:
-        gvb_df = pd.read_json(gvb_json, orient="split")
-        empty_fc = pd.DataFrame()
+        if not gvb_json:
+            return _empty_forecast_fig("Lade GVB-Daten...")
 
-        fig = _create_pipeline_chart(
-            forecast_df=empty_fc,
-            metadata={},
-            gvb_data=gvb_df,
-            target=target or "gesamt",
-            is_fluss_mode=bool(is_fluss_mode),
-            horizon_quarters=horizon or 6,
-            show_backtest=False,              # initial kein Backtest
-            backtest_mode="overlay"           # Modus fest verdrahtet
-        )
-        return fig
+        try:
+            # --- Sektor vor Verarbeitung filtern ---
+            try:
+                gvb_json_filtered = _filter_gvb_json_by_sektor(gvb_json, sektor_value)  # nutzt globalen Helper (falls vorhanden)
+            except Exception:
+                gvb_json_filtered = _filter_gvb_json_by_sektor_fallback(gvb_json, sektor_value)
 
-    except Exception as e:
-        logger.error(f"[InitialHistory] Fehler beim Laden der Historie: {e}")
-        return _empty_forecast_fig("Fehler beim Laden der historischen Daten")
+            # Store → DataFrame
+            try:
+                gvb_df = _parse_store_df(gvb_json_filtered)  # bevorzugter App-Helper
+            except Exception:
+                # robuster Fallback
+                gvb_df = pd.read_json(gvb_json_filtered, orient="split")
+
+            empty_fc = pd.DataFrame()
+
+            # Hinweis: Falls der Filter zu einem leeren Frame führt, zeichnen wir dennoch eine leere Historie
+            # (die Chart-Funktion sollte damit robust umgehen); optional könnte man hier eine Meldung setzen.
+
+            fig = _create_pipeline_chart(
+                forecast_df=empty_fc,
+                metadata={},
+                gvb_data=gvb_df,
+                target=target or "gesamt",
+                is_fluss_mode=bool(is_fluss_mode),
+                horizon_quarters=horizon or 6,
+                show_backtest=False,            # initial kein Backtest
+                backtest_mode="overlay"         # Modus fest verdrahtet
+            )
+            return fig
+
+        except Exception as e:
+            logger.error(f"[InitialHistory] Fehler beim Laden der Historie: {e}")
+            return _empty_forecast_fig("Fehler beim Laden der historischen Daten")
 
 
 def _compute_simple_metrics(metadata: dict) -> dict:
@@ -3096,226 +3205,234 @@ def _compute_simple_metrics(metadata: dict) -> dict:
         State('show-backtest-switch', 'value'),
         # NEU: vorab geladenes Modell aus Preset/Store für PKL-Reuse
         State('model-artifact-store', 'data'),
+        # NEU: Sektor-Auswahl (PH/NFK)
+        State('forecast-sektor-dropdown', 'value'),
     ],
     prevent_initial_call=True
 )
 def create_pipeline_forecast(
     n_clicks, exog_json, target, exog_vars, horizon,
-    use_cache, gvb_json, is_fluss_mode,
-    show_backtest,
-    model_payload
-):
-    """
-    Hauptcallback für Forecast-Erstellung mit 80% und 95% Konfidenzintervallen.
-    Backtest-Darstellung ist fest auf 'overlay' (gestrichelte Linie) gesetzt.
-    """
-    import numpy as np
-
-    # -------- Helpers für leicht verständliche Metriken --------
-    def _compute_simple_metrics(metadata: dict) -> dict:
+    use_cache, gvb_json, is_fluss_mode, show_backtest,
+    model_payload, sektor_value
+    ):
         """
-        Leicht verständliche Kennzahlen aus CV-Performance + Backtest ableiten.
-        Erwartet in metadata:
-          - cv_performance: {'cv_rmse','cv_mae','cv_r2','residuals', ...}
-          - backtest_results: [{'date':..., 'actual':..., 'predicted':...}, ...] (falls verfügbar)
-          - diagnostics.ci.coverage: {80: xx.x, 95: yy.y} (optional, in %)
+        Hauptcallback für Forecast-Erstellung mit 80% und 95% Konfidenzintervallen.
+        Backtest-Darstellung ist fest auf 'overlay' (gestrichelte Linie) gesetzt.
+        Sektor-Filter (PH/NFK) wird VOR Adapter-Anlage angewandt.
         """
-        cv = (metadata or {}).get('cv_performance', {}) or {}
-        mae = cv.get('cv_mae', cv.get('mae'))
-        rmse = cv.get('cv_rmse', cv.get('rmse'))
-        r2 = cv.get('cv_r2', cv.get('r2'))
+        import numpy as np
+        import pandas as pd
 
-        bt = (metadata or {}).get('backtest_results', []) or []
-        actual = np.asarray([b.get('actual') for b in bt if b.get('actual') is not None], dtype=float)
-        pred   = np.asarray([b.get('predicted') for b in bt if b.get('predicted') is not None], dtype=float)
+        # -------- Helpers für leicht verständliche Metriken --------
+        def _compute_simple_metrics(metadata: dict) -> dict:
+            cv = (metadata or {}).get('cv_performance', {}) or {}
+            mae = cv.get('cv_mae', cv.get('mae'))
+            rmse = cv.get('cv_rmse', cv.get('rmse'))
+            r2 = cv.get('cv_r2', cv.get('r2'))
 
-        # Bias (%): durchschnittliche Über-/Unterschätzung relativ zur typischen Größe
-        bias_pct = None
-        if actual.size and pred.size and actual.size == pred.size:
-            num = float(np.nanmean(pred - actual))
-            denom = float(np.nanmean(np.abs(actual))) or np.nan
-            if np.isfinite(denom) and denom != 0:
-                bias_pct = 100.0 * num / denom
+            bt = (metadata or {}).get('backtest_results', []) or []
+            actual = np.asarray([b.get('actual') for b in bt if b.get('actual') is not None], dtype=float)
+            pred   = np.asarray([b.get('predicted') for b in bt if b.get('predicted') is not None], dtype=float)
 
-        # sMAPE (%)
-        smape = None
-        if actual.size and pred.size and actual.size == pred.size:
-            denom = (np.abs(actual) + np.abs(pred))
-            valid = denom > 0
-            if valid.any():
-                smape = 100.0 * np.nanmean(2.0 * np.abs(pred[valid] - actual[valid]) / denom[valid])
+            bias_pct = None
+            if actual.size and pred.size and actual.size == pred.size:
+                num = float(np.nanmean(pred - actual))
+                denom = float(np.nanmean(np.abs(actual))) or np.nan
+                if np.isfinite(denom) and denom != 0:
+                    bias_pct = 100.0 * num / denom
 
-        # Trefferquote Richtung (%)
-        directional = None
-        if actual.size >= 2 and pred.size >= 2:
-            da = np.sign(np.diff(actual))
-            dp = np.sign(np.diff(pred))
-            directional = 100.0 * float(np.mean(da == dp))
+            smape = None
+            if actual.size and pred.size and actual.size == pred.size:
+                denom = (np.abs(actual) + np.abs(pred))
+                valid = denom > 0
+                if valid.any():
+                    smape = 100.0 * np.nanmean(2.0 * np.abs(pred[valid] - actual[valid]) / denom[valid])
 
-        # CI-Coverage (falls vorhanden, in %)
-        coverage = ((metadata or {}).get('diagnostics', {}).get('ci', {}) or {}).get('coverage') or {}
+            directional = None
+            if actual.size >= 2 and pred.size >= 2:
+                da = np.sign(np.diff(actual))
+                dp = np.sign(np.diff(pred))
+                directional = 100.0 * float(np.mean(da == dp))
 
-        return {
-            "mae": mae,
-            "rmse": rmse,
-            "r2": r2,
-            "bias_pct": bias_pct,
-            "smape": smape,
-            "directional": directional,
-            "coverage": coverage
-        }
+            coverage = ((metadata or {}).get('diagnostics', {}).get('ci', {}) or {}).get('coverage') or {}
 
-    def _fmt_num(x, nd=2, dash='—'):
+            return {"mae": mae, "rmse": rmse, "r2": r2,
+                    "bias_pct": bias_pct, "smape": smape,
+                    "directional": directional, "coverage": coverage}
+
+        def _fmt_num(x, nd=2, dash='—'):
+            try:
+                return dash if x is None or not np.isfinite(float(x)) else f"{float(x):.{nd}f}"
+            except Exception:
+                return dash
+
+        def _fmt_pct(x, nd=1, dash='—'):
+            try:
+                return dash if x is None or not np.isfinite(float(x)) else f"{float(x):.{nd}f}%"
+            except Exception:
+                return dash
+        # -----------------------------------------------------------
+
+        # Kleiner Fallback-Filter, falls der globale Helper nicht verfügbar ist
+        def _filter_gvb_json_by_sektor_fallback(gjson: str, sektor: str) -> str:
+            try:
+                df = _parse_store_df(gjson)  # vorhandener App-Helper
+                if isinstance(df, pd.DataFrame) and not df.empty and "sektor" in df.columns and sektor:
+                    sekt = str(sektor).strip().upper()
+                    df = df[df["sektor"].astype(str).str.upper() == sekt].copy()
+                return df.to_json(orient="split", date_format="iso")
+            except Exception:
+                return gjson
+
+        ctx = dash.callback_context
+        if not ctx.triggered or not n_clicks:
+            raise dash.exceptions.PreventUpdate
+
+        if not HAS_PIPELINE or DashboardForecastAdapter is None:
+            msg = "Pipeline-Adapter nicht gefunden – bitte Integration prüfen."
+            empty_icicle = go.Figure()
+            empty_icicle.update_layout(template='plotly_white')
+            return (
+                _empty_forecast_fig(msg),
+                html.Div(msg, className="text-danger"),
+                html.Div(),
+                empty_icicle,
+                dash.no_update,
+                dash.no_update
+            )
+
         try:
-            return dash if x is None or not np.isfinite(float(x)) else f"{float(x):.{nd}f}"
-        except Exception:
-            return dash
+            # --- Sektor vor dem Adapter filtern ---
+            try:
+                # bevorzuge globalen Helper, sonst fallback
+                gvb_json_filtered = _filter_gvb_json_by_sektor(gvb_json, sektor_value)  # type: ignore[name-defined]
+            except Exception:
+                gvb_json_filtered = _filter_gvb_json_by_sektor_fallback(gvb_json, sektor_value)
 
-    def _fmt_pct(x, nd=1, dash='—'):
-        try:
-            return dash if x is None or not np.isfinite(float(x)) else f"{float(x):.{nd}f}%"
-        except Exception:
-            return dash
-    # -----------------------------------------------------------
+            # --- Adapter mit gefiltertem Store aufbauen ---
+            adapter = DashboardForecastAdapter(gvb_json_filtered, exog_json)
+            # Sektor & UI-Infos in pipeline_info hinterlegen (u. a. für cache_tag)
+            adapter.pipeline_info.update({
+                "ui_target": target,
+                "use_flows": bool(is_fluss_mode),
+                "horizon": int(horizon or 6),
+                "sektor": sektor_value
+            })
 
-    ctx = dash.callback_context
-    if not ctx.triggered or not n_clicks:
-        raise dash.exceptions.PreventUpdate
+            # --- Forecast ausführen ---
+            forecast_df, metadata = adapter.run_forecast(
+                target=target,
+                selected_exog=exog_vars or [],
+                horizon=horizon or 6,
+                use_cached=bool(use_cache),
+                force_retrain=False,
+                use_flows=bool(is_fluss_mode),
+                confidence_levels=[80, 95],
+                preload_model_path=(model_payload or {}).get('path')
+            )
 
-    if not HAS_PIPELINE or DashboardForecastAdapter is None:
-        msg = "Pipeline-Adapter nicht gefunden – bitte Integration prüfen."
-        empty_icicle = go.Figure()
-        empty_icicle.update_layout(template='plotly_white')
-        return (
-            _empty_forecast_fig(msg),
-            html.Div(msg, className="text-danger"),
-            html.Div(),
-            empty_icicle,
-            dash.no_update,
-            dash.no_update
-        )
+            logger.info(f"[Forecast] DataFrame-Spalten: {forecast_df.columns.tolist()}")
+            if 'yhat_lower_80' in forecast_df.columns:
+                logger.info("[Forecast] ✓ 80% Konfidenzintervall vorhanden")
+            if 'yhat_lower_95' in forecast_df.columns:
+                logger.info("[Forecast] ✓ 95% Konfidenzintervall vorhanden")
 
-    try:
-        adapter = DashboardForecastAdapter(gvb_json, exog_json)
+            # Backtest verfügbar?
+            if metadata and 'backtest_results' in metadata:
+                logger.info(f"[Forecast] ✓ Backtest-Daten: {len(metadata['backtest_results'])} Punkte")
+            else:
+                logger.info("[Forecast] ℹ Keine Backtest-Daten in Metadata")
 
-        forecast_df, metadata = adapter.run_forecast(
-            target=target,
-            selected_exog=exog_vars or [],
-            horizon=horizon or 4,
-            use_cached=bool(use_cache),
-            force_retrain=False,
-            use_flows=bool(is_fluss_mode),
-            confidence_levels=[80, 95],
-            # NEU: Vorab geladenes Modell aus dem Store (Preset) wiederverwenden
-            preload_model_path=(model_payload or {}).get('path')
-        )
+            # Chart erstellen – Backtest-Modus fest auf 'overlay'
+            # (Optionales Labeling mit Sektor)
+            fig = _create_pipeline_chart(
+                forecast_df=forecast_df,
+                metadata=metadata,
+                gvb_data=adapter.gvb_data,
+                target=target,
+                is_fluss_mode=bool(is_fluss_mode),
+                horizon_quarters=horizon or 6,
+                show_backtest=bool(show_backtest),
+                backtest_mode="overlay"
+            )
 
-        logger.info(f"[Forecast] DataFrame-Spalten: {forecast_df.columns.tolist()}")
-        if 'yhat_lower_80' in forecast_df.columns:
-            logger.info("[Forecast] ✓ 80% Konfidenzintervall vorhanden")
-        if 'yhat_lower_95' in forecast_df.columns:
-            logger.info("[Forecast] ✓ 95% Konfidenzintervall vorhanden")
+            # ---------- Kompakte, verständliche Metriken ----------
+            simple = _compute_simple_metrics(metadata)
 
-        # Prüfe ob Backtest-Daten verfügbar sind
-        if metadata and 'backtest_results' in metadata:
-            logger.info(f"[Forecast] ✓ Backtest-Daten verfügbar: {len(metadata['backtest_results'])} Punkte")
-        else:
-            logger.info("[Forecast] ℹ Keine Backtest-Daten in Metadata")
+            mae_txt   = _fmt_num(simple["mae"], nd=2)
+            rmse_txt  = _fmt_num(simple["rmse"], nd=2)
+            r2_txt    = _fmt_num(simple["r2"], nd=3)
+            bias_txt  = _fmt_pct(simple["bias_pct"], nd=1)
+            smape_txt = _fmt_pct(simple["smape"], nd=1)
+            dir_txt   = _fmt_pct(simple["directional"], nd=0)
 
-        # Chart erstellen – Backtest-Modus fest auf 'overlay'
-        fig = _create_pipeline_chart(
-            forecast_df=forecast_df,
-            metadata=metadata,
-            gvb_data=adapter.gvb_data,
-            target=target,
-            is_fluss_mode=bool(is_fluss_mode),
-            horizon_quarters=horizon or 6,
-            show_backtest=bool(show_backtest),
-            backtest_mode="overlay"
-        )
+            cov80 = _fmt_pct((simple["coverage"] or {}).get(80), nd=1)
+            cov95 = _fmt_pct((simple["coverage"] or {}).get(95), nd=1)
 
-        # ---------- Neue, verständliche Metrik-Boxen ----------
-        simple = _compute_simple_metrics(metadata)
+            if dbc is not None:
+                metrics = dbc.Container([
+                    dbc.Row(dbc.Col(html.Div([
+                        html.Span("Mittlerer Schätzfehler (MAE)", className="text-muted small"),
+                        html.H4(mae_txt, className="mb-0 mt-1"),
+                        html.Div(f"Bias (Über-/Unterschätzung): {bias_txt}", className="small text-secondary mt-1")
+                    ])), className="mb-3 pb-3", style={"borderBottom": "1px solid #e9ecef"}),
 
-        mae_txt   = _fmt_num(simple["mae"], nd=2)
-        rmse_txt  = _fmt_num(simple["rmse"], nd=2)
-        r2_txt    = _fmt_num(simple["r2"], nd=3)
-        bias_txt  = _fmt_pct(simple["bias_pct"], nd=1)
-        smape_txt = _fmt_pct(simple["smape"], nd=1)
-        dir_txt   = _fmt_pct(simple["directional"], nd=0)
+                    dbc.Row(dbc.Col(html.Div([
+                        html.Span("Prognosegüte", className="text-muted small"),
+                        html.H4(smape_txt, className="mb-0 mt-1"),
+                        html.Div(f"Trefferquote Richtung: {dir_txt}", className="small text-secondary mt-1")
+                    ])), className="mb-3 pb-3", style={"borderBottom": "1px solid #e9ecef"}),
 
-        cov80 = _fmt_pct((simple["coverage"] or {}).get(80), nd=1)
-        cov95 = _fmt_pct((simple["coverage"] or {}).get(95), nd=1)
+                    dbc.Row(dbc.Col(html.Div([
+                        html.Span("Modellgüte", className="text-muted small"),
+                        html.H4(r2_txt, className="mb-0 mt-1"),
+                        html.Div(f"Typisches Fehlerband (RMSE): {rmse_txt}", className="small text-secondary mt-1"),
+                        html.Div(f"CI-Deckung 80/95: {cov80} / {cov95}", className="small text-secondary mt-1")
+                    ])), className="mb-3 pb-1"),
+                ])
+            else:
+                metrics = html.Div([
+                    html.Div([html.B("Mittlerer Schätzfehler (MAE): "), html.Span(mae_txt),
+                            html.Small(f"  | Bias: {bias_txt}")]),
+                    html.Div([html.B("Prognosegüte (sMAPE): "), html.Span(smape_txt),
+                            html.Small(f"  | Richtungstreffer: {dir_txt}")]),
+                    html.Div([html.B("Modellgüte (R², CV): "), html.Span(r2_txt),
+                            html.Small(f"  | Fehlerband (RMSE): {rmse_txt}  | CI-Deckung 80/95: {cov80}/{cov95}")]),
+                ], className="p-2")
 
-        if dbc is not None:
-            metrics = dbc.Container([
-                # Block 1: Mittlerer Schätzfehler
-                dbc.Row(dbc.Col(html.Div([
-                    html.Span("Mittlerer Schätzfehler (MAE)", className="text-muted small"),
-                    html.H4(mae_txt, className="mb-0 mt-1"),
-                    html.Div(f"Bias (Über-/Unterschätzung): {bias_txt}", className="small text-secondary mt-1")
-                ])), className="mb-3 pb-3", style={"borderBottom": "1px solid #e9ecef"}),
+            feature_bar = _create_feature_importance(metadata)
+            features = (metadata or {}).get('model_complexity', {}).get('top_features', {})
+            icicle_fig = create_feature_importance_icicle(features, top_n=15)
 
-                # Block 2: Prognosegüte
-                dbc.Row(dbc.Col(html.Div([
-                    html.Span("Prognosegüte", className="text-muted small"),
-                    html.H4(smape_txt, className="mb-0 mt-1"),
-                    html.Div(f"Trefferquote Richtung: {dir_txt}", className="small text-secondary mt-1")
-                ])), className="mb-3 pb-3", style={"borderBottom": "1px solid #e9ecef"}),
+            model_path = (metadata or {}).get("model_path")
+            snapshot_path = (metadata or {}).get("exog_snapshot_path")
+            model_payload_out = {
+                "path": model_path,
+                "exog_snapshot_path": snapshot_path
+            } if (model_path or snapshot_path) else dash.no_update
 
-                # Block 3: Modellgüte
-                dbc.Row(dbc.Col(html.Div([
-                    html.Span("Modellgüte", className="text-muted small"),
-                    html.H4(r2_txt, className="mb-0 mt-1"),
-                    html.Div(f"Typisches Fehlerband (RMSE): {rmse_txt}", className="small text-secondary mt-1"),
-                    html.Div(f"CI-Deckung 80/95: {cov80} / {cov95}", className="small text-secondary mt-1")
-                ])), className="mb-3 pb-1"),
-            ])
-        else:
-            metrics = html.Div([
-                html.Div([html.B("Mittlerer Schätzfehler (MAE): "), html.Span(mae_txt),
-                          html.Small(f"  | Bias: {bias_txt}")]),
-                html.Div([html.B("Prognosegüte (sMAPE): "), html.Span(smape_txt),
-                          html.Small(f"  | Richtungstreffer: {dir_txt}")]),
-                html.Div([html.B("Modellgüte (R², CV): "), html.Span(r2_txt),
-                          html.Small(f"  | Fehlerband (RMSE): {rmse_txt}  | CI-Deckung 80/95: {cov80}/{cov95}")]),
-            ], className="p-2")
-        # ------------------------------------------------------
+            return (
+                fig,
+                metrics,
+                feature_bar,
+                icicle_fig,
+                model_payload_out,
+                {"has_forecast": True}
+            )
 
-        feature_bar = _create_feature_importance(metadata)
-        features = (metadata or {}).get('model_complexity', {}).get('top_features', {})
-        icicle_fig = create_feature_importance_icicle(features, top_n=15)
-
-        model_path = (metadata or {}).get("model_path")
-        snapshot_path = (metadata or {}).get("exog_snapshot_path")
-        model_payload_out = {
-            "path": model_path,
-            "exog_snapshot_path": snapshot_path
-        } if (model_path or snapshot_path) else dash.no_update
-
-        return (
-            fig,
-            metrics,
-            feature_bar,
-            icicle_fig,
-            model_payload_out,
-            {"has_forecast": True}
-        )
-
-    except Exception as e:
-        logger.exception(f"[Forecast] Fehler: {e}")
-        empty_icicle = go.Figure()
-        empty_icicle.update_layout(template='plotly_white')
-        fig, error_html, _ = _error_forecast_response(e)
-        return (
-            fig,
-            error_html,
-            html.Div(),
-            empty_icicle,
-            dash.no_update,
-            dash.no_update
-        )
-
+        except Exception as e:
+            logger.exception(f"[Forecast] Fehler: {e}")
+            empty_icicle = go.Figure()
+            empty_icicle.update_layout(template='plotly_white')
+            fig, error_html, _ = _error_forecast_response(e)
+            return (
+                fig,
+                error_html,
+                html.Div(),
+                empty_icicle,
+                dash.no_update,
+                dash.no_update
+            )
 
 
 # ==============================================================================
@@ -3333,19 +3450,35 @@ def create_pipeline_forecast(
         State('forecast-horizon-store', 'data'),
         State('exog-data-store', 'data'),
         State('external-exog-dropdown', 'value'),
+        # NEU: Sektor (PH/NFK)
+        State('forecast-sektor-dropdown', 'value'),
     ],
     prevent_initial_call=True
 )
 def toggle_backtest_visualization(
     show_backtest,
     fc_state, gvb_json, target, is_fluss_mode, horizon,
-    exog_json, exog_vars
+    exog_json, exog_vars, sektor_value
 ):
     """
     Aktualisiert den Chart, wenn der Backtest-Schalter betätigt wird.
     Modus ist fest auf 'overlay' (gestrichelte Linie) gesetzt.
     Lädt Forecast (aus Cache) neu und fügt ggf. Backtest-Overlay hinzu.
+    Berücksichtigt den gewählten Sektor (PH/NFK), indem der GVB-Store vorab gefiltert wird.
     """
+    import pandas as pd
+
+    # Fallback-Filter, falls globaler Helper nicht importiert ist
+    def _filter_gvb_json_by_sektor_fallback(gjson: str, sektor: str) -> str:
+        try:
+            df = _parse_store_df(gjson)
+            if isinstance(df, pd.DataFrame) and not df.empty and "sektor" in df.columns and sektor:
+                sekt = str(sektor).strip().upper()
+                df = df[df["sektor"].astype(str).str.upper() == sekt].copy()
+            return df.to_json(orient="split", date_format="iso")
+        except Exception:
+            return gjson
+
     # Nur wenn bereits ein Forecast existiert
     if not fc_state or not fc_state.get('has_forecast'):
         logger.info("[Backtest-Toggle] Kein Forecast vorhanden, überspringe")
@@ -3356,22 +3489,33 @@ def toggle_backtest_visualization(
         return dash.no_update
 
     try:
-        # Modus fest verdrahten
         backtest_mode = "overlay"
-        logger.info(f"[Backtest-Toggle] show={show_backtest}, mode={backtest_mode}")
+        logger.info(f"[Backtest-Toggle] show={show_backtest}, mode={backtest_mode}, sektor={sektor_value}")
 
-        # Adapter initialisieren
         if not HAS_PIPELINE or DashboardForecastAdapter is None:
             logger.error("[Backtest-Toggle] Pipeline nicht verfügbar")
             return dash.no_update
 
-        adapter = DashboardForecastAdapter(gvb_json, exog_json)
+        # --- Sektor vor dem Adapter filtern ---
+        try:
+            gvb_json_filtered = _filter_gvb_json_by_sektor(gvb_json, sektor_value)  # nutzt globalen Helper, wenn vorhanden
+        except Exception:
+            gvb_json_filtered = _filter_gvb_json_by_sektor_fallback(gvb_json, sektor_value)
+
+        # --- Adapter aufsetzen (Cache nutzen) ---
+        adapter = DashboardForecastAdapter(gvb_json_filtered, exog_json)
+        adapter.pipeline_info.update({
+            "ui_target": target,
+            "use_flows": bool(is_fluss_mode),
+            "horizon": int(horizon or 6),
+            "sektor": sektor_value
+        })
 
         # Forecast erneut durchführen (nutzt Cache, retrain=False)
         forecast_df, metadata = adapter.run_forecast(
             target=target,
             selected_exog=exog_vars or [],
-            horizon=horizon or 4,
+            horizon=horizon or 6,
             use_cached=True,
             force_retrain=False,
             use_flows=bool(is_fluss_mode),
@@ -3396,7 +3540,6 @@ def toggle_backtest_visualization(
     except Exception as e:
         logger.exception(f"[Backtest-Toggle] Fehler: {e}")
         return dash.no_update
-
 
 # ==============================================================================
 # CALLBACK-REGISTRIERUNG
