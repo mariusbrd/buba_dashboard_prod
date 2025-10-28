@@ -1,0 +1,39 @@
+{
+  "Q_t0": "2025Q1",
+  "target": "Einlagen",
+  "yhat_baseline_t0": 17.933333333333334,
+  "horizon_Q": 4,
+  "table": [
+    {
+      "Quarter": "2025Q2",
+      "Forecast_Baseline": 59.15,
+      "Forecast_Scenario": 59.15,
+      "Delta_abs": 0.0,
+      "Delta_pct": 0.0
+    },
+    {
+      "Quarter": "2025Q3",
+      "Forecast_Baseline": 28.000000000000007,
+      "Forecast_Scenario": 27.494963497262763,
+      "Delta_abs": -0.5050365027372443,
+      "Delta_pct": -1.8037017954901577
+    },
+    {
+      "Quarter": "2025Q4",
+      "Forecast_Baseline": 17.933333333333334,
+      "Forecast_Scenario": 17.97238972252808,
+      "Delta_abs": 0.039056389194747965,
+      "Delta_pct": 0.21778655684803697
+    },
+    {
+      "Quarter": "2026Q1",
+      "Forecast_Baseline": 1.4749999999999999,
+      "Forecast_Scenario": 1.3275,
+      "Delta_abs": -0.14749999999999996,
+      "Delta_pct": -10.0
+    }
+  ],
+  "scenario_cols": [
+    "inflation__last"
+  ]
+}

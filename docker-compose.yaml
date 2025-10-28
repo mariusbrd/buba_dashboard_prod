@@ -1,0 +1,17 @@
+# docker-compose.yml
+services:
+  gvb:
+    image: gvb-dashboard:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      SCENARIO_FORCE_REFRESH: "1"   # "1" um den Monats-Download anzustoßen
+      TZ: Europe/Berlin
+    volumes:
+      - ./forecaster/user_presets:/app/forecaster/user_presets
+      - ./forecaster/trained_models:/app/forecaster/trained_models
+      - ./scenario:/app/scenario
+    restart: unless-stopped

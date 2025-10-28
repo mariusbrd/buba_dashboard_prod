@@ -1,0 +1,39 @@
+{
+  "Q_t0": "2025Q1",
+  "target": "Gesamt GVB",
+  "yhat_baseline_t0": 89.9,
+  "horizon_Q": 4,
+  "table": [
+    {
+      "Quarter": "2025Q2",
+      "Forecast_Baseline": 89.9,
+      "Forecast_Scenario": 89.9,
+      "Delta_abs": 0.0,
+      "Delta_pct": 0.0
+    },
+    {
+      "Quarter": "2025Q3",
+      "Forecast_Baseline": 83.35000000000001,
+      "Forecast_Scenario": 80.2247361483434,
+      "Delta_abs": -3.1252638516566122,
+      "Delta_pct": -3.749566708646205
+    },
+    {
+      "Quarter": "2025Q4",
+      "Forecast_Baseline": 83.35000000000001,
+      "Forecast_Scenario": 76.44751271543355,
+      "Delta_abs": -6.902487284566462,
+      "Delta_pct": -8.281328475784596
+    },
+    {
+      "Quarter": "2026Q1",
+      "Forecast_Baseline": 70.35,
+      "Forecast_Scenario": 66.61393956948343,
+      "Delta_abs": -3.7360604305165594,
+      "Delta_pct": -5.310675807415152
+    }
+  ],
+  "scenario_cols": [
+    "inflation__last"
+  ]
+}
