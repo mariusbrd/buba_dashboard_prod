@@ -6,3 +6,4 @@ __pycache__/
 .vscode/
 .gh_token/
 .ghtoken/
+.ghtoken
