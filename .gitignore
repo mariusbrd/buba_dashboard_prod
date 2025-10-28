@@ -7,3 +7,8 @@ __pycache__/
 .gh_token/
 .ghtoken/
 .ghtoken
+.gh_token.gh_token
+.env
+*.pem
+*.pfx
+*.key
