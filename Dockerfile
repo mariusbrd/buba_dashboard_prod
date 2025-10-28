@@ -1,28 +1,38 @@
-# Dockerfile
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1.6
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    TZ=Europe/Berlin
-
-# (optional) Zeitzone installieren, damit keine Interaktion nötig ist
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    tzdata \
+########## Stage 1: Private Git-Repo komplett holen ##########
+FROM debian:bookworm-slim AS fetcher
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git \
  && rm -rf /var/lib/apt/lists/*
 
+# Passe REPO_REF auf Tag/Commit-SHA an für reproduzierbare Builds
+ARG REPO_PATH="mariusbrd/buba_dashbord_prod"
+ARG REPO_REF="main"
+
+# Token nur zur Buildzeit als Secret mounten (landet NICHT im finalen Image)
+RUN --mount=type=secret,id=gh_token \
+    set -eu; \
+    token="$(cat /run/secrets/gh_token)"; \
+    git clone --depth 1 --branch "$REPO_REF" \
+      "https://oauth2:${token}@github.com/${REPO_PATH}.git" /src; \
+    # Remote-URL ohne Token hinterlegen (nur Hygiene)
+    git -C /src remote set-url origin "https://github.com/${REPO_PATH}.git"
+
+########## Stage 2: Runtime ##########
+FROM python:3.11-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 TZ=Europe/Berlin
 WORKDIR /app
 
-# zuerst nur requirements kopieren, damit Layer gecached werden können
-COPY requirements.txt /app/requirements.txt
+# 1) Dependencies zuerst installieren (Cache-freundlich)
+#    Falls die Repo keine requirements.txt hat, kannst du diesen Block anpassen/entfernen.
+COPY --from=fetcher /src/requirements.txt /app/requirements.txt
 RUN pip install --upgrade pip && pip install -r /app/requirements.txt
 
-# jetzt den kompletten Projektinhalt kopieren
-# (inkl. overview/, forecaster/, scenario/, loader/ usw.)
-COPY . /app
+# 2) Gesamte Repo als App-Code übernehmen
+COPY --from=fetcher /src/ /app/
 
-# interner Port aus app.py
+# 3) Extern erreichbarer Port (laut app.py intern 8080)
 EXPOSE 8080
 
-# Standard: direkter Start von app.py (wichtig, da __main__-Block scenario/instructor triggert)
+# 4) Start – wichtig: __main__-Pfad der app.py wird ausgeführt
 CMD ["python", "app.py"]
