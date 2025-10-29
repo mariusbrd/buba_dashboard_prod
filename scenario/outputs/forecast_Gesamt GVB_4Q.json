@@ -14,23 +14,23 @@
     {
       "Quarter": "2025Q3",
       "Forecast_Baseline": 83.35000000000001,
-      "Forecast_Scenario": 80.2247361483434,
-      "Delta_abs": -3.1252638516566122,
-      "Delta_pct": -3.749566708646205
+      "Forecast_Scenario": 78.03668406935392,
+      "Delta_abs": -5.313315930646084,
+      "Delta_pct": -6.374704175940112
     },
     {
       "Quarter": "2025Q4",
       "Forecast_Baseline": 83.35000000000001,
-      "Forecast_Scenario": 76.44751271543355,
-      "Delta_abs": -6.902487284566462,
-      "Delta_pct": -8.281328475784596
+      "Forecast_Scenario": 75.12967536174814,
+      "Delta_abs": -8.220324638251867,
+      "Delta_pct": -9.862417082485743
     },
     {
       "Quarter": "2026Q1",
       "Forecast_Baseline": 70.35,
-      "Forecast_Scenario": 66.61393956948343,
-      "Delta_abs": -3.7360604305165594,
-      "Delta_pct": -5.310675807415152
+      "Forecast_Scenario": 65.88458887648694,
+      "Delta_abs": -4.46541112351305,
+      "Delta_pct": -6.347421639677399
     }
   ],
   "scenario_cols": [

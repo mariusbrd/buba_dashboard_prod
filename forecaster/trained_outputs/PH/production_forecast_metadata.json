@@ -160,16 +160,11 @@
     -14.899999999999999,
     -14.500000000000007
   ],
-  "forecast_timestamp": "2025-10-28T23:25:16.783703",
+  "forecast_timestamp": "2025-10-29T00:28:48.778979",
   "model_source": "cached",
   "exog_source": {
     "mode": "manual",
-    "selected_exog": [
-      "QSA.Q.N.DE.W0.S1M.S1.N.A.LE.F._Z._Z.XDC._T.S.V.N._T__last",
-      "QSA.Q.N.DE.W0.S1M.S1._Z.B.B6G._Z._Z._Z.XDC._T.S.V.N._T__last",
-      "IRS.M.DE.L.L40.CI.0000.EUR.N.Z__last",
-      "ICP.M.DE.N.000000.4.ANR__last"
-    ],
+    "selected_exog": [],
     "downloader_output_path": null
   },
   "cv_residual_std_unscaled": 20.43608845321447,

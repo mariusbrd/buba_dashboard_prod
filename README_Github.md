@@ -13,7 +13,7 @@ cd F:\Dropbox\Projekte\BuBa
 Nur nötig, wenn diese Werte noch nicht gesetzt sind oder neu gesetzt werden sollen.
 
 ```bash
-git config --global user.name "mariusbred"
+git config --global user.name "mariusbrd"
 git config --global user.email "mariusbrede@gmail.com"
 git config --global init.defaultBranch main
 ```
