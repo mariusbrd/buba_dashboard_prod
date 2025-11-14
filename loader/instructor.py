@@ -143,7 +143,8 @@ def _load_defs_sheet(xlsx: pd.ExcelFile, sheet_name: str) -> pd.DataFrame:
 
 
 def _read_variable_defs(xlsx_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    xls = pd.ExcelFile(xlsx_path)
+    #xls = pd.ExcelFile(xlsx_path)
+    xls = pd.ExcelFile(xlsx_path, engine="openpyxl")
     sheets = {s.lower(): s for s in xls.sheet_names}
     sheet_fluss = next((v for k, v in sheets.items() if "fluss" in k), None)
     sheet_bestand = next((v for k, v in sheets.items() if "bestand" in k), None)

@@ -392,7 +392,7 @@ def show_initial_historical_view(pathname, target_ui, reset_clicks):
         if not analysis_excel.exists():
             raise FileNotFoundError(f"Datei nicht gefunden: {analysis_excel}")
         
-        df = pd.read_excel(analysis_excel, sheet_name="final_dataset")
+        df = pd.read_excel(analysis_excel, sheet_name="final_dataset", engine="openpyxl")
         df["Datum"] = pd.to_datetime(df["Datum"])
         df = df.sort_values("Datum").reset_index(drop=True)
         
@@ -1837,7 +1837,7 @@ def _load_scenario_final_dataset() -> pd.DataFrame:
             f"Scenario-Datei nicht gefunden: {primary} (Fallback: {fallback})"
         )
 
-    df = pd.read_excel(xlsx_path, sheet_name="final_dataset")
+    df = pd.read_excel(xlsx_path, sheet_name="final_dataset", engine="openpyxl")
     df.columns = [str(c).strip() for c in df.columns]
 
     date_col = None
@@ -2394,7 +2394,7 @@ def init_exog_override_table_quarterly(pathname):
     def _read_sheet(name: str) -> pd.DataFrame:
         if name not in xl.sheet_names:
             return pd.DataFrame()
-        df = pd.read_excel(xl, sheet_name=name)
+        df = pd.read_excel(xl, sheet_name=name, engine="openpyxl")
         # Datumsspalte normalisieren
         dcol = None
         for cand in ("Datum", "datum", "Date", "date"):
@@ -2817,7 +2817,7 @@ def reset_exog_overrides(n_clicks, columns):
     def _read_sheet(name: str) -> pd.DataFrame:
         if name not in xl.sheet_names:
             return pd.DataFrame()
-        df = pd.read_excel(xl, sheet_name=name)
+        df = pd.read_excel(xl, sheet_name=name, engine="openpyxl")
         dcol = None
         for cand in ["Datum", "datum", "Date", "date"]:
             if cand in df.columns:
@@ -3147,7 +3147,7 @@ def _create_analysis_data_from_scenarios(
     def _read_sheet(name: str) -> pd.DataFrame:
         if name not in xl.sheet_names:
             return pd.DataFrame()
-        df = pd.read_excel(xl, sheet_name=name)
+        df = pd.read_excel(xl, sheet_name=name, engine="openpyxl")
         dcol = None
         for cand in ("Datum", "datum", "Date", "date"):
             if cand in df.columns:
@@ -3525,7 +3525,7 @@ def _find_analysis_or_scenario_excel() -> Path:
             xl = pd.ExcelFile(path)
             if "final_dataset" not in xl.sheet_names:
                 return False
-            df = pd.read_excel(xl, sheet_name="final_dataset", nrows=5)
+            df = pd.read_excel(xl, sheet_name="final_dataset", nrows=5, engine="openpyxl")
         except Exception:
             return False
 
