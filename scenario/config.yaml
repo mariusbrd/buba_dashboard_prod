@@ -1,0 +1,50 @@
+# Minimal configuration for the downloader-only mini project
+start_date: "2000-01"
+end_date: auto
+prefer_cache: true
+
+cache:
+  cache_dir: "scenario_cache"
+  cache_max_age_days: 60
+
+# If you set anchor_var, the final dataset will be trimmed to the window
+# where the anchor variable is not NaN (exactly as in your pipeline).
+anchor_var: null
+
+series_definitions:
+
+  ## Bestands-Daten:
+  # Einlagen: "INDEX(BBAF3.Q.F21.S14.DE.S1.W0.LE.N._X.B,BBAF3.Q.F22.S14.DE.S1.W0.LE.N._X.B,BBAF3.Q.F29A.S14.DE.S1.W0.LE.N._X.B,BBAF3.Q.F29B.S14.DE.S1.W0.LE.N._X.B,BBAF3.Q.F29D.S14.DE.S1.W0.LE.N._X.B)"
+  # Wertpapiere: "INDEX(BBAF3.Q.F3.S14.DE.S1.W0.LE.N._X.B,BBAF3.Q.F511.S14.DE.S1.W0.LE.N._X.B,BBAF3.Q.F512.S14.DE.S1.W0.LE.N._X.B,BBAF3.Q.F519.S14.DE.S1.W0.LE.N._X.B,BBAF3.Q.F52.S14.DE.S1.W0.LE.N._X.B)"
+  # Versicherungen: "INDEX(BBAF3.Q.F6.S14.DE.S1.W0.LE.N._X.B,BBAF3.Q.F8.S14.DE.S1.W0.LE.N._X.B)"
+  # Kredite: "INDEX(BBAF3.Q.F4.S1.W0.S14.DE.LE.N._X.B,BBAF3.Q.F8.S1.W0.S14.DE.LE.N._X.B)"
+
+  ## Fluss-Daten:
+  Einlagen: "INDEX(BBAF3.Q.F21.S14.DE.S1.W0.F.N._X.B,BBAF3.Q.F22.S14.DE.S1.W0.F.N._X.B,BBAF3.Q.F29A.S14.DE.S1.W0.F.N._X.B,BBAF3.Q.F29B.S14.DE.S1.W0.F.N._X.B,BBAF3.Q.F29D.S14.DE.S1.W0.F.N._X.B)"
+  Wertpapiere: "INDEX(BBAF3.Q.F3.S14.DE.S1.W0.F.N._X.B,BBAF3.Q.F511.S14.DE.S1.W0.F.N._X.B,BBAF3.Q.F512.S14.DE.S1.W0.F.N._X.B,BBAF3.Q.F519.S14.DE.S1.W0.F.N._X.B,BBAF3.Q.F52.S14.DE.S1.W0.F.N._X.B)"
+  Versicherungen: "INDEX(BBAF3.Q.F6.S14.DE.S1.W0.F.N._X.B,BBAF3.Q.F8.S14.DE.S1.W0.F.N._X.B)"
+  Kredite: "INDEX(BBAF3.Q.F4.S1.W0.S14.DE.F.N._X.B,BBAF3.Q.F8.S1.W0.S14.DE.F.N._X.B)"
+
+  lt_interest_rate: "IRS.M.DE.L.L40.CI.0000.EUR.N.Z"
+  property_prices: "RESR.Q.DE._T.N._TR.TVAL.10.TB.N.IX"
+  gdp: "MNA.Q.N.DE.W2.S1.S1.B.B1GQ._Z._Z._Z.EUR.V.N"
+  unemployment: "LFSI.M.DE.S.UNEHRT.TOTAL0.15_74.T"
+  inflation: "ICP.M.DE.N.000000.4.ANR"
+
+calendar_index:
+  freq: "MS"      # "MS" = Monatsanfang, alternativ "M" = Monatsende
+  fill: "none"    # "none" | "ffill" | "bfill"
+  # fill_limit: 3 # optional, begrenzt die Anzahl aufeinanderfolgender Fills
+
+# Index base settings (keine Wirkung bei enable_index: false)
+enable_index: true
+index_aggregate: "sum" 
+#index_base_year: 2024
+#index_base_value: 100.0
+
+# Output file
+output_path: "output.xlsx"
+
+
+
+
