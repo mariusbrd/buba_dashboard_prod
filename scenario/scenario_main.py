@@ -1,8 +1,16 @@
 # === Path Helpers: immer unter scenario/data arbeiten ===
 from pathlib import Path
 
-_THIS_DIR = Path(__file__).resolve().parent
-SCENARIO_DIR = _THIS_DIR  # falls die Files schon im Ordner "scenario" liegen
+# Ordner dieses Moduls (…/scenario)
+SCENARIO_DIR = Path(__file__).resolve().parent
+
+# Projekt-Root (ein Ordner über scenario), analog zu den anderen Modulen
+try:
+    APP_ROOT: Path = SCENARIO_DIR.parent
+except Exception:
+    APP_ROOT = Path.cwd()
+
+# Datenverzeichnis für Scenario-Module
 SCENARIO_DATA_DIR = SCENARIO_DIR / "data"
 SCENARIO_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -10,8 +18,8 @@ def scenario_data_path(*parts: str) -> Path:
     return SCENARIO_DATA_DIR.joinpath(*parts)
 
 # unsere drei "offiziellen" Dateien im Unterordner
-DEFAULT_OUTPUT_XLSX   = scenario_data_path("output.xlsx")
-DEFAULT_ANALYSIS_XLSX = scenario_data_path("analysis_data.xlsx")
+DEFAULT_OUTPUT_XLSX    = scenario_data_path("output.xlsx")
+DEFAULT_ANALYSIS_XLSX  = scenario_data_path("analysis_data.xlsx")
 DEFAULT_OVERRIDES_XLSX = scenario_data_path("scenario_overrides.xlsx")
 
 

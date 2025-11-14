@@ -7,6 +7,16 @@ import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
 from dash import callback_context  # optional, falls du lieber callback_context statt ctx nutzt
 
+
+# --- Pfad-Logik: Overview-Ordner + App-Root ---
+OVERVIEW_DIR = Path(__file__).resolve().parent  # .../overview
+
+try:
+    APP_ROOT: Path = OVERVIEW_DIR.parent        # Projektroot (dort liegt typischerweise app.py)
+except Exception:
+    APP_ROOT = Path.cwd()
+
+
 # --- Safe logging shim: vermeidet NameError für Log/logger ---
 import logging
 logger = logging.getLogger("GVB_Dashboard")
@@ -228,17 +238,24 @@ def initialize_data_stores(pathname, existing_data):
     # --------- Daten laden ---------
     used_fallback = False
     try:
-        # Kandidaten für gvb_output.xlsx + Diagnose-Logging
+        # Kandidaten für gvb_output.xlsx + Diagnose-Logging (App-Root basiert)
         try:
+            logger.info(f"[Init] APP_ROOT={APP_ROOT.resolve()}")
+            logger.info(f"[Init] OVERVIEW_DIR={OVERVIEW_DIR.resolve()}")
             logger.info(f"[Init] CWD={Path.cwd().resolve()}")
         except Exception:
             pass
 
         gvb_candidates = [
+            # bevorzugte Pfade relativ zur App-Root-Logik
+            APP_ROOT / "gvb_output.xlsx",
+            APP_ROOT / "loader" / "gvb_output.xlsx",
+            # zusätzlich: relativ zum overview-Ordner
+            OVERVIEW_DIR / "gvb_output.xlsx",
+            OVERVIEW_DIR / "loader" / "gvb_output.xlsx",
+            # letzter Fallback: aktuelles Arbeitsverzeichnis
             Path.cwd() / "gvb_output.xlsx",
             Path.cwd() / "loader" / "gvb_output.xlsx",
-            Path(__file__).parent / "gvb_output.xlsx",
-            Path(__file__).parent / "loader" / "gvb_output.xlsx",
         ]
 
         logger.info("[Init] Suche gvb_output.xlsx an:")
@@ -348,7 +365,6 @@ def initialize_data_stores(pathname, existing_data):
         }
 
     return gvb_json, exog_json, metadata
-
 
 
 # ==============================================================================

@@ -68,6 +68,12 @@ FORECASTER_DIR = Path(__file__).parent.resolve()
 # Das Root-Verzeichnis (parent von forecaster/)
 ROOT_DIR = FORECASTER_DIR.parent.resolve()
 
+# Kompatibel zu app.py: App-Root des Projekts
+try:
+    APP_ROOT: Path = ROOT_DIR
+except Exception:
+    APP_ROOT = Path.cwd()
+
 # Beide Verzeichnisse zum Python-Pfad hinzufügen (falls nicht bereits vorhanden)
 for path_to_add in [str(FORECASTER_DIR), str(ROOT_DIR)]:
     if path_to_add not in sys.path:
@@ -174,7 +180,7 @@ except Exception as e1:
                         LOGGER.error("=" * 80)
                         LOGGER.error("[Pipeline] ❌ ALLE Import-Versuche fehlgeschlagen!")
                         LOGGER.error(f"[Pipeline] Forecaster-Dir: {FORECASTER_DIR}")
-                        LOGGER.error(f"[Pipeline] Root-Dir: {ROOT_DIR}")
+                        LOGGER.error(f"[Pipeline] Root-Dir (APP_ROOT): {APP_ROOT}")
                         LOGGER.error(f"[Pipeline] Aktuelles Verzeichnis: {Path.cwd()}")
                         LOGGER.error(f"[Pipeline] Python-Pfad (erste 5): {sys.path[:5]}")
                         LOGGER.error("=" * 80)

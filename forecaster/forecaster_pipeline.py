@@ -51,6 +51,15 @@ pd.set_option("display.width", 140)
 pd.set_option("display.max_columns", 200)
 
 
+FORECASTER_DIR = Path(__file__).resolve().parent  
+
+try:
+    APP_ROOT: Path = FORECASTER_DIR.parent    
+except Exception:
+    APP_ROOT = Path.cwd()
+
+
+
 # =============================================================================
 # Logging
 # =============================================================================
@@ -153,11 +162,12 @@ class Config:
     # =========================
     # Output & Persistierung
     # =========================
+
     output_dir: str = field(
-        default_factory=lambda: str((Path(__file__).parent / "forecaster" / "trained_outputs").resolve())
+        default_factory=lambda: str((FORECASTER_DIR / "trained_outputs").resolve())
     )
     model_dir: str = field(
-        default_factory=lambda: str((Path(__file__).parent / "forecaster" / "trained_models").resolve())
+        default_factory=lambda: str((FORECASTER_DIR / "trained_models").resolve())
     )
     use_cached_model: bool = True
     random_state: int = 42
@@ -1744,8 +1754,9 @@ def _section_1_prepare_data(cfg: Config) -> dict:
             if not out_path:
                 candidates = [
                     getattr(cfg, "output_dir", None),
-                    str(Path(__file__).parent.resolve()),
-                    os.getcwd(),
+                    str(FORECASTER_DIR),  # Ordner forecaster
+                    str(APP_ROOT),        # Projektroot
+                    os.getcwd(),          # letzter Fallback
                 ]
                 out_path = autodetect_downloader_output(candidates)
             if out_path and os.path.exists(out_path):

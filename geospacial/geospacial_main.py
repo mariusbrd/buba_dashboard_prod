@@ -45,19 +45,24 @@ EMPTY_GEO_MAP_HTML = build_empty_map(
 
 logger = logging.getLogger("GeoSpacial")
 
+
+GEO_DIR = Path(__file__).resolve().parent  # .../geospacial
+
+try:
+    APP_ROOT: Path = GEO_DIR.parent       # Projektroot (da liegt meist app.py)
+except Exception:
+    APP_ROOT = Path.cwd()
+
 # ============================================================
 # Pfade & Dateien
 # ============================================================
-BASE_DIR = Path(__file__).resolve().parent
-DATA_INPUT_DIR = BASE_DIR / "data_input"
+
+DATA_INPUT_DIR = GEO_DIR / "data_input"
 PROCESSED_DIR = DATA_INPUT_DIR / "deutschlandatlas_processed"
 INDICATOR_CSV_PATH = DATA_INPUT_DIR / "deutschlandatlas_services_mit_counts.csv"
-# Basis-Excel mit allen Deutschlandatlas-Indikatoren
 DEUTSCHLANDATLAS_XLSX_PATH = DATA_INPUT_DIR / "Deutschlandatlas.xlsx"
-
-# Optional: Standard-Blattnamen je Ebene im Deutschlandatlas-Excel.
-# Wenn deine Sheet-Namen anders heißen, bitte hier anpassen.
 DEUTSCHLANDATLAS_EXCEL_PATH = DATA_INPUT_DIR / "Deutschlandatlas.xlsx"
+
 
 # optional: falls die Sheet-Namen in der Excel anders heißen, hier anpassen
 DEUTSCHLANDATLAS_SHEETS_BY_LEVEL: Dict[str, str] = {

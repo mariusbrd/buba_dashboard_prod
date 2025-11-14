@@ -31,6 +31,12 @@ _THIS_FILE = Path(__file__).resolve()
 _LOADER_DIR = _THIS_FILE.parent               # .../loader
 _SOURCES_DIR = _LOADER_DIR / "sources"        # .../loader/sources
 
+# App-Root analog zu app.py (Projektwurzel)
+try:
+    APP_ROOT: Path = _LOADER_DIR.parent       # ein Ordner über loader
+except Exception:
+    APP_ROOT = Path.cwd()
+
 # loader/ in sys.path aufnehmen, falls nicht drin
 if str(_LOADER_DIR) not in sys.path:
     sys.path.insert(0, str(_LOADER_DIR))
@@ -38,6 +44,7 @@ if str(_LOADER_DIR) not in sys.path:
 # loader/sources/ in sys.path aufnehmen, falls vorhanden
 if _SOURCES_DIR.exists() and str(_SOURCES_DIR) not in sys.path:
     sys.path.insert(0, str(_SOURCES_DIR))
+
 
 # ============================================================
 # 2) Optional: loader importieren – aber Fehler NICHT eskalieren

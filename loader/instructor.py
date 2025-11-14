@@ -22,11 +22,21 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="pandas")
 # ---------------------------------------------------------------------
 # Basiskonfiguration
 # ---------------------------------------------------------------------
-HERE = Path.cwd()  # wichtig: Dashboard ruft uns aus dem Projekt-Root auf
 
-EXCEL_DEFS = "variable_defs.xlsx"   # Definitions-Excel
-OUTPUT_PARQUET = "gvb_output.parquet"
-OUTPUT_XLSX = "gvb_output.xlsx"
+THIS_FILE = Path(__file__).resolve()
+LOADER_DIR = THIS_FILE.parent               # .../loader
+
+try:
+    APP_ROOT: Path = LOADER_DIR.parent
+except Exception:
+    APP_ROOT = Path.cwd()
+
+HERE = APP_ROOT
+
+# liegt physisch in loader/variable_defs.xlsx
+EXCEL_DEFS = "loader/variable_defs.xlsx"    # Definitions-Excel
+OUTPUT_PARQUET = "loader/gvb_output.parquet"
+OUTPUT_XLSX = "loader/gvb_output.xlsx"
 
 LOADER_PATH: str | None = None     # falls loader.py woanders liegt
 WRITE_FILES = True

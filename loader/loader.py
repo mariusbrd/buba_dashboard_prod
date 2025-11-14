@@ -817,7 +817,9 @@ def run_from_config(config_path: str = "config.yaml") -> pd.DataFrame:
     cache_cfg = cfg.get("cache", {}) or {}
 
     # default: cwd/financial_cache
-    cache_dir_raw = cache_cfg.get("cache_dir", str((Path.cwd() / "financial_cache").resolve()))
+    base_dir_for_cache = Path(config_path).resolve().parent
+    default_cache_dir = (base_dir_for_cache / "financial_cache").resolve()
+    cache_dir_raw = cache_cfg.get("cache_dir", str(default_cache_dir))
     cache_dir = _normalize_loader_path_str(cache_dir_raw)
     cache_max_age_days = int(cache_cfg.get("cache_max_age_days", 60))
 

@@ -28,6 +28,19 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 
+from pathlib import Path
+
+# -------------------------------------------------------------------
+# Pfad-Logik: Scenario-Ordner + App-Root
+# -------------------------------------------------------------------
+SCENARIO_DIR = Path(__file__).resolve().parent  # .../scenario
+
+try:
+    APP_ROOT: Path = SCENARIO_DIR.parent        # Projektroot (dort liegt typischerweise app.py)
+except Exception:
+    APP_ROOT = Path.cwd()
+
+
 @dataclass
 class Config:
     # Datenquelle
@@ -117,10 +130,15 @@ class Config:
     future_exog_seasonal_period_q: int = 4
 
     # Output & Persistierung
-    output_dir: str = "outputs"
-    model_dir: str = "models_scenario_horizon"  # neuer Cache-Ordner, damit Neu-Train greift
+    output_dir: str = field(
+        default_factory=lambda: str((SCENARIO_DIR / "outputs").resolve())
+    )
+    model_dir: str = field(
+        default_factory=lambda: str((SCENARIO_DIR / "models_scenario_horizon").resolve())
+    )
     use_cached_model: bool = False              # Neu trainieren, damit Änderungen wirken
     random_state: int = 42
+
 
     # Guardrails (Level-Bound)
     target_lower_bound: Optional[float] = None
@@ -2076,18 +2094,17 @@ class ScenarioAnalysis:
 # =============================================================================
 # BEISPIEL-NUTZUNG
 # =============================================================================
-
 if __name__ == "__main__":
     cfg = Config(
-        excel_path="data/output.xlsx",
+        excel_path=str((APP_ROOT / "data" / "output.xlsx").resolve()),
         sheet_name="final_dataset",
         date_col="Datum",
         target_col="Einlagen",
         agg_methods_exog=["last", "mean"],
         agg_method_target="mean",
 
-        #exog_month_lags=[-12, -6, -3, -1],
-        #target_lags_q=[1, 2, 4],
+        # exog_month_lags=[-12, -6, -3, -1],
+        # target_lags_q=[1, 2, 4],
 
         exog_month_lags=[],
         target_lags_q=[],
@@ -2099,8 +2116,8 @@ if __name__ == "__main__":
         target_standardize=True,
         use_cached_model=True,
         random_state=42,
-        output_dir="outputs",
-        model_dir="scenario/models_scenario",  # eigener Ordner
+        output_dir=str((SCENARIO_DIR / "outputs").resolve()),
+        model_dir=str((SCENARIO_DIR / "models_scenario").resolve()),  # eigener Ordner
         min_train_quarters=24,
         gap_quarters=1,
         forecast_horizon_quarters=4,
@@ -2134,4 +2151,3 @@ if __name__ == "__main__":
     }
     res_fc = sa.forecast(H=4, scenario_future=scenario_future, persist=True)
     print(pd.DataFrame(res_fc["table"]).to_string(index=False))
-

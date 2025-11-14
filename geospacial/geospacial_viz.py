@@ -8,20 +8,24 @@ import pandas as pd
 import folium
 import branca.colormap as cm
 
-try:
-    BASE_DIR = Path(__file__).resolve().parent
-except NameError:
-    BASE_DIR = Path.cwd()
+# Geospacial App-Root-Logik
+GEO_DIR = Path(__file__).resolve().parent  # .../geospacial
 
-DATA_INPUT_DIR = BASE_DIR / "data_input"
+try:
+    APP_ROOT: Path = GEO_DIR.parent        # Projektroot (typisch: dort liegt app.py)
+except Exception:
+    APP_ROOT = Path.cwd()
+
+DATA_INPUT_DIR = GEO_DIR / "data_input"
 
 # GeoJSON / Shapes
 BASE_KRS = DATA_INPUT_DIR / "Shapefiles - KRS"
 BASE_GEM = DATA_INPUT_DIR / "Shapefiles - GEM"
 BASE_VBGEM = DATA_INPUT_DIR / "Shapefiles - VBGEM"
 
-OUTPUT_MAP_DIR = BASE_DIR / "data_output"
+OUTPUT_MAP_DIR = GEO_DIR / "data_output"
 OUTPUT_MAP_DIR.mkdir(parents=True, exist_ok=True)
+
 
 # dieselben Keys wie im main
 LEVEL_TO_SHAPE: Dict[str, Tuple[Path, str]] = {

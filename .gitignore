@@ -14,3 +14,5 @@ __pycache__/
 *.key
 .ghtoken
 .gh_token
+.gvb_last_refresh
+.scenario_month.stamp

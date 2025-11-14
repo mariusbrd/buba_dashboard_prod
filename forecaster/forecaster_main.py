@@ -46,6 +46,14 @@ except Exception:
 import shutil
 
 
+FORECASTER_DIR = Path(__file__).resolve().parent
+
+try:
+    APP_ROOT: Path = FORECASTER_DIR.parent
+except Exception:
+    APP_ROOT = Path.cwd()
+
+
 # ==============================================================================
 # KONFIGURATION & KONSTANTEN
 # ==============================================================================
@@ -67,11 +75,14 @@ except Exception:
 INFO_COLOR = GVB_COLORS.get('Einlagen', '#0d6efd')
 
 # Pfade für Presets/Snapshots
-PRESETS_DIR = Path("./forecaster/presets")
+PRESETS_DIR = FORECASTER_DIR / "presets"
 PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+
 SNAPSHOTS_DIR = PRESETS_DIR / "snapshots"
 SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+
 HCPRESET_CACHE_FILE = PRESETS_DIR / "hc_presets_cache.json"
+
 
 # ==============================================================================
 # LOGGING SETUP
@@ -433,23 +444,37 @@ def _build_main_e1_table_from_store(
 # ==============================================================================
 
 def _find_ecb_db() -> Optional[Path]:
-    """Findet ecb_database.xlsx."""
+    """Findet ecb_database.xlsx im Projektumfeld auf Basis von APP_ROOT."""
+    base_dir = APP_ROOT
+    forecaster_dir = FORECASTER_DIR
+
+    # 1) Bevorzugte, feste Pfade relativ zum Code
     candidates = [
-        Path(__file__).parent / "ecbdata" / "ecb_database.xlsx",
-        Path.cwd() / "ecbdata" / "ecb_database.xlsx",
-        Path.cwd() / "ecb_database.xlsx"
+        forecaster_dir / "ecbdata" / "ecb_database.xlsx",  # forecaster/ecbdata/ecb_database.xlsx
+        base_dir / "ecbdata" / "ecb_database.xlsx",        # <APP_ROOT>/ecbdata/ecb_database.xlsx
+        base_dir / "ecb_database.xlsx",                    # <APP_ROOT>/ecb_database.xlsx
     ]
-    
+
     for p in candidates:
         if p.exists():
             return p
-    
+
+    # 2) Suche nach generischen ecb_* Dateien im Projekt
+    search_roots = [forecaster_dir, base_dir]
+    for root in search_roots:
+        for pattern in ["ecbdata/ecb_*.xlsx", "ecb_*.xlsx"]:
+            matches = list(root.glob(pattern))
+            if matches:
+                return matches[0]
+
+    # 3) Letzter Fallback: aktuelles Arbeitsverzeichnis (nur zur Sicherheit)
     for pattern in ["ecbdata/ecb_*.xlsx", "ecb_*.xlsx"]:
         matches = list(Path.cwd().glob(pattern))
         if matches:
             return matches[0]
-    
+
     return None
+
 
 
 def _load_ecb_options() -> List[Dict]:
@@ -825,8 +850,8 @@ def _download_exog_codes(ecb_codes: list) -> pd.DataFrame:
         from datetime import datetime, timezone
 
         # App-Root: .../forecaster/ → ein Ordner hoch
-        app_root = Path(__file__).resolve().parent.parent
-        loader_dir = app_root / "loader"
+        loader_dir = APP_ROOT / "loader"
+
 
         # globaler Cache (dürfen wir weiter nutzen)
         cache_dir = loader_dir / "financial_cache"
@@ -2099,7 +2124,7 @@ def update_horizon_display(quarters):
 # "Neu"-Button -> Cache (runs) leeren
 # ==============================================================================
 
-_BASE_DIR = Path(__file__).resolve().parent.parent  # ein Ordner hoch von /forecaster
+_BASE_DIR = APP_ROOT  # ein Ordner hoch von /forecaster
 RUNS_DIR = Path(os.getenv("FORECASTER_RUNS_DIR", _BASE_DIR / "loader" / "runs")).resolve()
 
 
@@ -3098,6 +3123,10 @@ def export_forecast_rawdata(
 
     import os
     from pathlib import Path
+
+
+
+
 
     def _flatten_metadata_to_df(meta: dict) -> pd.DataFrame:
         rows = []

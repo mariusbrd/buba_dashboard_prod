@@ -1991,7 +1991,7 @@ def run_instructor_loader() -> Path:
     Bevorzugt die neue loader/gvb_output.parquet.
     """
     logger.info("📊 Lade echte GVB-Daten...")
-    current_dir = Path.cwd()
+    current_dir = APP_ROOT
     loader_dir = current_dir / "loader"
     instructor_py = loader_dir / "instructor.py"
 
@@ -2065,7 +2065,7 @@ def load_gvb_excel_or_build() -> pathlib.Path | None:
     Falls nichts Brauchbares liegt, wird der loader/instructor.py gestartet und
     die neu erzeugte Datei zurückgegeben.
     """
-    current_dir = Path.cwd()
+    current_dir = APP_ROOT
     loader_dir = current_dir / "loader"
 
     # 1) bekannte Orte durchgehen – jetzt mit Parquet ganz oben
@@ -2211,7 +2211,7 @@ def ensure_monthly_gvb_refresh() -> Path | None:
     - wenn aktueller Monat != gespeicherter Monat → run_instructor_loader()
     - gibt den Pfad zur (neu) erzeugten gvb_output.* zurück, wenn vorhanden
     """
-    base_dir = Path.cwd()
+    base_dir = APP_ROOT
     loader_dir = base_dir / "loader"
     marker_file = loader_dir / ".gvb_last_refresh"
 
@@ -3423,156 +3423,6 @@ def create_scenario_layout():
     ])
 
 
-# def create_geo_layout():
-#     """
-#     Geo Analyse Layout:
-#     - Oben eine Konfigurations Card wie bei der Szenario Seite
-#     - Links Karte/Diagramm
-#     - Rechts Detail/KPI Bereich
-#     - Unten Tabelle
-#     - Eigene IDs, damit nichts mit der Szenario Seite kollidiert
-#     """
-#     return html.Div([
-#         # --- Card 1: Geo Steuerung --------------------------------------------
-#         dbc.Card([
-#             dbc.CardHeader("Geo-Analyse Konfiguration"),
-#             dbc.CardBody([
-#                 dbc.Row([
-#                     # 1. Auswahl Zielgröße
-#                     dbc.Col([
-#                         dbc.Label("Zielgröße:", className="fw-bold mb-1"),
-#                         dcc.Dropdown(
-#                             id="geo-target-dropdown",
-#                             options=[
-#                                 {"label": "Gesamt GVB", "value": "gesamt"},
-#                                 {"label": "Einlagen", "value": "einlagen"},
-#                                 {"label": "Wertpapiere", "value": "wertpapiere"},
-#                                 {"label": "Versicherungen", "value": "versicherungen"},
-#                                 {"label": "Kredite", "value": "kredite"},
-#                             ],
-#                             value="gesamt",
-#                             clearable=False,
-#                         ),
-#                     ], width=3),
-
-#                     # 2. Auswahl räumliche Ebene
-#                     dbc.Col([
-#                         dbc.Label("Regionale Ebene:", className="fw-bold mb-1"),
-#                         dcc.Dropdown(
-#                             id="geo-level-dropdown",
-#                             options=[
-#                                 {"label": "Bundesländer", "value": "bundesland"},
-#                                 {"label": "Landkreise", "value": "landkreis"},
-#                                 {"label": "PLZ Gebiete", "value": "plz"},
-#                             ],
-#                             value="bundesland",
-#                             clearable=False,
-#                         ),
-#                     ], width=3),
-
-#                     # 3. Auswahl Indikator (aus Parquet)
-#                     dbc.Col([
-#                         dbc.Label("Indikator:", className="fw-bold mb-1"),
-#                         dcc.Dropdown(
-#                             id="geo-indicator-dropdown",
-#                             options=[],              # wird per Callback gefüllt
-#                             placeholder="Indikator wählen...",
-#                             clearable=False,
-#                         ),
-#                     ], width=3),
-
-#                     # 4. Buttons
-#                     dbc.Col([
-#                         dbc.Label("\u00A0", className="fw-bold mb-1", style={"visibility": "hidden"}),
-#                         dbc.ButtonGroup(
-#                             [
-#                                 dbc.Button("Filter anwenden", id="apply-geo-filters-btn", color="primary", size="sm"),
-#                                 dbc.Button("Zurücksetzen", id="reset-geo-filters-btn", color="secondary", size="sm"),
-#                             ],
-#                             className="flex-wrap gap-2",
-#                         ),
-#                         html.Small(
-#                             "Wähle Zielgröße, Ebene und Indikator um die Karte zu aktualisieren.",
-#                             className="text-muted d-block mt-1"
-#                         ),
-#                     ], width=3, className="d-flex flex-column justify-content-start"),
-#                 ], className="g-2", align="start"),
-#             ])
-#         ], className="settings-panel mb-3"),
-
-#         # --- Hauptbereich: links Karte / rechts Details -----------------------
-#         dbc.Row([
-#             dbc.Col(
-#                 dbc.Card([
-#                     dbc.CardHeader("Regionale Darstellung"),
-#                     dbc.CardBody(
-#                         dcc.Loading(
-#                             id="loading-geo-map",
-#                             type="circle",
-#                             children=dcc.Graph(id="geo-map", style={"height": "520px"}),
-#                             style={"minHeight": "520px"}
-#                         )
-#                     ),
-#                 ], className="chart-container flex-fill h-100", style={"minHeight": "600px"}),
-#                 width=8,
-#                 className="d-flex",
-#             ),
-
-#             dbc.Col(
-#                 dbc.Card([
-#                     dbc.CardHeader("Details zur Auswahl"),
-#                     dbc.CardBody(
-#                         dcc.Loading(
-#                             id="loading-geo-details",
-#                             type="circle",
-#                             children=html.Div(
-#                                 id="geo-detail-panel",
-#                                 className="vstack gap-2",
-#                                 style={"height": "560px", "overflowY": "auto"}
-#                             ),
-#                             style={"minHeight": "560px", "display": "flex", "alignItems": "center", "justifyContent": "center"}
-#                         ),
-#                         className="d-flex flex-column",
-#                         style={"position": "relative"},
-#                     ),
-#                 ], className="chart-container flex-fill h-100", style={"minHeight": "600px"}),
-#                 width=4,
-#                 className="d-flex",
-#             ),
-#         ], className="g-2", align="stretch"),
-
-#         # --- Tabelle unten ----------------------------------------------------
-#         dbc.Row([
-#             dbc.Col(
-#                 dbc.Card([
-#                     dbc.CardHeader("Regionale Übersicht"),
-#                     dbc.CardBody([
-#                         dash_table.DataTable(
-#                             id="geo-table",
-#                             columns=[],
-#                             data=[],
-#                             style_as_list_view=True,
-#                             page_size=20,
-#                             style_table={"overflowX": "auto"},
-#                             style_cell={"fontSize": "12px", "padding": "6px", "textAlign": "left"},
-#                             style_header={"fontWeight": "bold"},
-#                         ),
-#                         html.Small(
-#                             "Tipp: Tabelle nach Excel exportieren oder nach Region filtern.",
-#                             className="text-muted d-block mt-2"
-#                         ),
-#                     ])
-#                 ], className="chart-container"),
-#                 width=12,
-#             )
-#         ], className="mt-2"),
-
-#         # --- Hidden Store -----------------------------------------------------
-#         dcc.Store(id="geo-filter-store", data={}),
-#     ])
-
-
-
 # ==============================================================================
 # HELPER-FUNKTIONEN UND UTILITIES
 # ==============================================================================
@@ -3676,8 +3526,6 @@ def _apply_last_n_quarters(df: pd.DataFrame, n_last: int) -> pd.DataFrame:
 
 
 
-
-
 # ==============================================================================
 # DASH APP SETUP UND CORE CALLBACKS
 # ==============================================================================
@@ -3725,13 +3573,6 @@ from geospacial.geospacial_main import (
 )
 
 register_geo_callbacks(app)
-
-
-
-
-
-
-
 
 # --------------------------------------------------------------------------
 # Custom CSS / index_string
@@ -4103,10 +3944,21 @@ def _set_active_nav(pathname):
     )
 
 # ==============================================================================
-# APP START (store-basiert, thread-sicher)
+# PRELOAD-FUNKTION (für __main__ und für Gunicorn-Import)
 # ==============================================================================
-if __name__ == "__main__":
-    # nur im echten Start, nicht beim Import
+
+def run_startup_preloads():
+    """
+    Führt alle Preload-/Housekeeping-Jobs aus, ohne den Dash-Server zu starten.
+    - monatlicher GVB-Refresh
+    - GVB-Datei sicherstellen (Excel/Parquet)
+    - Geo / Deutschlandatlas-Rebuild
+    - Szenario-Downloader (monatlich)
+    - Szenario Analyse-Daten
+    Kann sowohl im __main__-Start als auch beim Import (z.B. im Docker)
+    aufgerufen werden. Sollte idempotent sein.
+    """
+    # nur im echten Start / Preload, nicht bei jedem Request
     self_clean_startup()
 
     # Szenario Komponenten nur laden, wenn vorhanden
@@ -4117,14 +3969,14 @@ if __name__ == "__main__":
             should_run_this_month,
             mark_ran_this_month,
         )
-        HAS_SCENARIO_DOWNLOADER_LOCAL = True
+        has_scenario_downloader_local = True
     except Exception as e:
         logger.warning(f"⚠️ scenario_dataloader konnte nicht geladen werden: {e}")
-        HAS_SCENARIO_DOWNLOADER_LOCAL = False
+        has_scenario_downloader_local = False
 
     lg = logging.getLogger("GVB_Dashboard")
     lg.info("=" * 60)
-    lg.info("🏦 Horn & Company GVB Dashboard")
+    lg.info("🏦 Horn & Company GVB Dashboard – Preload")
     lg.info("=" * 60)
 
     # 1) GVB Datei sicherstellen
@@ -4150,7 +4002,7 @@ if __name__ == "__main__":
     try:
         geo_results = rebuild_deutschlandatlas_files(
             levels=("krs", "gem", "vbgem"),  # explizit alle Ebenen
-            export_excel=False,               # kein Excel-Export
+            export_excel=False,              # kein Excel-Export
             logger=lambda m: lg.info(str(m))
         )
 
@@ -4181,7 +4033,7 @@ if __name__ == "__main__":
         lg.warning(f"⚠️ Geo Rebuild fehlgeschlagen: {e}")
 
     # 3) Szenario Daten wie bisher (max 1 mal pro Monat)
-    if HAS_SCENARIO_DOWNLOADER_LOCAL:
+    if has_scenario_downloader_local:
         try:
             cfg_file = scenario_path / "config.yaml"
             if not cfg_file.exists():
@@ -4231,7 +4083,31 @@ if __name__ == "__main__":
         except Exception as e:
             lg.warning(f"⚠️ Konnte scenario Analyse Daten nicht initialisieren: {e}")
 
-    # 4) Dash starten
+# ==============================================================================
+# OPTIONALER IMPORT-PRELOAD (für Gunicorn & Co.)
+# ==============================================================================
+# Wenn z.B. im Docker-Container GVB_PRELOAD_ON_IMPORT=1 gesetzt ist und
+# ein WSGI-Server wie gunicorn mit "app:server" startet, wird der Preload
+# einmalig beim Import ausgeführt, ohne app.run() aufzurufen.
+if os.getenv("GVB_PRELOAD_ON_IMPORT", "0") == "1":
+    _lg = logging.getLogger("GVB_Dashboard")
+    try:
+        _lg.info("🔁 Import-Hook: führe run_startup_preloads() aus (GVB_PRELOAD_ON_IMPORT=1)")
+        run_startup_preloads()
+    except Exception as _e:
+        _lg.warning(f"⚠️ Preload beim Import fehlgeschlagen: {_e}")
+
+# ==============================================================================
+# APP START (store-basiert, thread-sicher)
+# ==============================================================================
+if __name__ == "__main__":
+    lg = logging.getLogger("GVB_Dashboard")
+    lg.info("🚀 Starte Dash-Server im __main__-Modus …")
+
+    # Preloads lokal ausführen
+    run_startup_preloads()
+
+    # Dash starten
     app.run(
         host="0.0.0.0",
         port=8080,
