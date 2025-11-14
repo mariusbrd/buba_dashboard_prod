@@ -20,3 +20,4 @@ xlsxwriter
 gunicorn
 dash-ag-grid
 folium
+yaml
