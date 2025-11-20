@@ -1,0 +1,23 @@
+# .dockerignore
+.git
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+.ipynb_checkpoints/
+.env
+.ghtoken
+.gh_token
+.env.*
+.vscode/
+.idea/
+venv/
+.venv/
+node_modules/
+.DS_Store
+Thumbs.db
+# große lokale Exporte optional ausschließen (wenn du sie nicht im Image brauchst)
+# gvb_output.xlsx
+# forecaster/trained_models/
+# forecaster/user_presets/
