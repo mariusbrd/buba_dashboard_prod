@@ -1,0 +1,87 @@
+﻿Name,Indikatorkennung,Beschreibung
+Flächennutzung (Siedlungs- und Verkehrsfläche),fl_suv,Anteil der Siedlungs- und Verkehrsfläche an der Gesamtfläche im Jahr 2022 in %
+Flächennutzung (Landwirtschaftsfläche),fl_landw,Anteil der Landwirtschaftsfläche an der Gesamtfläche im Jahr 2022 in %
+Flächennutzung (Waldfläche),fl_wald,Anteil der Waldfläche an der Gesamtfläche im Jahr 2022 in %
+Bevölkerungsdichte,bev_dicht,Einwohner/-innen je km² im Jahr 2022
+Bevölkerungsentwicklung,bev_entw,Gemittelte Entwicklung der Bevölkerungszahl zwischen 2017 und 2022 pro Jahr in %
+Binnenwanderung,bev_binw,Saldo der Binnenwanderungen pro 10.000 Einwohner/-innen im Jahr 2022
+Außenwanderung,bev_ausw,Saldo der Außenwanderungen pro 10.000 Einwohner/-innen im Jahr 2022
+Steuereinnahmekraft,st_einnkr,Steuereinnahmekraft je Einwohner/-in im Jahr 2023 in €
+Kommunale Kassenkredite,ko_kasskred,Kommunale Kassenkredite je Einwohner/-in im Jahr 2023 in €
+Altersgruppen der Bevölkerung (unter 18-Jährige),bev_u18,Anteil der unter 18-Jährigen an der Gesamtbevölkerung im Jahr 2022 in %
+Altersgruppen der Bevölkerung (18- bis unter 65-Jährige),bev_18_65,Anteil der 18- bis unter 65-Jährigen an der Gesamtbevölkerung im Jahr 2022 in %
+Altersgruppen der Bevölkerung (65-Jährige und Ältere),bev_ue65,Anteil der 65-Jährigen und Älteren an der Gesamtbevölkerung im Jahr 2022 in %
+Ausländische Bevölkerung,bev_ausl,Anteil der Ausländer/-innen an der Gesamtbevölkerung im Jahr 2022 in %
+Vereinssport (Sportvereinsdichte),ew_sportv,Sportvereine je 100.000 Einwohner/-innen im Jahr 2023
+Vereinssport (Organisationsgrad in Sportvereinen),mitgl_sportv,Mitglieder in Sportvereinen je 100 Einwohner/-innen im Jahr 2023
+Wahlbeteiligung bei der Bundestagswahl,wahl_beteil,Bundestagswahlbeteiligung 2025 in Kreisen in %
+Angebotsmieten,preis_miet,Wiedervermietungsmieten (Angebotsmieten nettokalt) im Jahr 2023 in € je m²
+Bestandsmieten,preis_miet_best,Nettokaltmiete in bestehenden Mietverhältnissen in € je m² im Jahr 2022
+Baulandpreise,preis_baul,Baulandpreise für Ein-/Zweifamilienhäuser im Jahr 2022 in € je m²
+Eigentumsquote,wohn_eigen,Anteil Haushalte im selbstgenutzten Wohneigentum an allen Haushalten 2022 in %
+Wohnungsleerstand,wohn_leer,Anteil leer stehender Wohnungen in Gebäuden mit Wohnraum im Jahr 2022 in %
+Baufertigstellungen (Ein- und Zweifamilienhäuser),wohn_EZFH,Fertiggestellte Wohnungen in neuen Ein- und Zweifamilienhäusern je 10.000 Einwohner/-innen im Jahr 2022
+Baufertigstellungen (Mehrfamilienhäuser),wohn_MFH,Fertiggestellte Wohnungen in neuen Mehrfamilienhäusern je 10.000 Einwohner/-innen im Jahr 2022
+Erneuerbare Heizenergien (Wohnungsneubau),heiz_wohn,Anteil fertiggestellter Wohnungen mit primär erneuerbarer Heizenergie an allen errichteten Wohnungen in neuen Wohngebäuden im Jahr 2022 in %
+Erneuerbare Heizenergien (Wohnungsbestand),heiz_wohn_best,Anteil fertiggestellter Wohnungen mit primär erneuerbarer Heizenergie an allen bestehenden Wohnungen in Wohngebäuden im Jahr 2022 in %
+Berufsqualifikation der Beschäftigten (akademischer Abschluss),bquali_unifh,Anteil sozialversicherungspflichtig Beschäftigter am Arbeitsort mit einem akademischen Abschluss an allen sozialversicherungspflichtig Beschäftigten im Jahr 2023 in %
+"Berufsqualifikation der Beschäftigten (anerkannter Berufsabschluss, ohne einen akademischen Abschluss)",bquali_mabschl,Anteil sozialversicherungspflichtig Beschäftigter am Arbeitsort mit einem anerkannten Berufsabschluss und ohne einen akademischen Abschluss an allen sozialversicherungspflichtig Beschäftigten im Jahr 2023 in %
+Berufsqualifikation der Beschäftigten (ohne einen Berufs-/ akademischen Abschluss),bquali_oabschl,Anteil sozialversicherungspflichtig Beschäftigter am Arbeitsort ohne einen Berufs-/ akademischen Abschluss an allen sozialversicherungspflichtig Beschäftigten im Jahr 2023 in %
+Erwerbstätige,erw_wachs,Gemittelte Entwicklung der Erwerbstätigenzahl am Arbeitsort von 2012 bis 2022 pro Jahr in %
+Veränderung des Arbeitsvolumens,erw_vol,Veränderung des Arbeitsvolumens am Arbeitsort 2014 zu 2022 in %
+Geringfügige Beschäftigung (ausschließlich geringfügig entlohnte Beschäftigte),erw_mini,Anteil der ausschließlich geringfügig entlohnten Beschäftigten am Arbeitsort an allen Erwerbstätigen im Jahr 2022 in %
+Geringfügige Beschäftigung (geringfügig entlohnte Beschäftigte im Nebenjob),erw_minineben,Anteil der geringfügig entlohnten Beschäftigten im Nebenjob am Arbeitsort an allen Erwerbstätigen im Jahr 2022 in %
+Beschäftigungsquote (insgesamt),beschq_insg,Sozialversicherungspflichtig Beschäftigte am Wohnort je 100 Einwohner/-innen im erwerbsfähigen Alter im Jahr 2023
+Beschäftigungsquote (Frauen),beschq_w,Sozialversicherungspflichtig beschäftigte Frauen am Wohnort je 100 Frauen im erwerbsfähigen Alter im Jahr 2023
+Beschäftigungsquote (Männer),beschq_m,Sozialversicherungspflichtig beschäftigte Männer am Wohnort je 100 Männer im erwerbsfähigen Alter im Jahr 2023
+Teilzeitquote (insgesamt),teilz_insg,Anteil der sozialversicherungspflichtig Beschäftigten in Teilzeit am Arbeitsort an den sozialversicherungspflichtig Beschäftigten im Jahr 2024 in %
+Teilzeitquote (Frauen),teilz_w,Weibliche sozialversicherungspflichtig Beschäftigte in Teilzeit am Arbeitsort an den weiblichen sozialversicherungspflichtig Beschäftigten im Jahr 2024 in %
+Teilzeitquote (Männer),teilz_m,Männliche sozialversicherungspflichtig Beschäftigte in Teilzeit am Arbeitsort an den männlichen sozialversicherungspflichtig Beschäftigten im Jahr 2024 in %
+Bruttoinlandsprodukt,erw_bip,Bruttoinlandsprodukt je erwerbstätige Person im Jahr 2022 in 1.000 €
+Arbeitslosenquote,alq,Arbeitslosenquote bezogen auf alle zivilen Erwerbspersonen im Jahr 2023 in %
+Verfügbares Einkommen privater Haushalte,hh_veink,Verfügbares Einkommen privater Haushalte je Einwohner/-in im Jahr 2022 in 1.000 €
+Überschuldung von Privatpersonen,schulden,Anteil überschuldeter Personen über 18 Jahre an der Altersgruppe im Jahr 2023 in %
+Väterbeteiligung am Elterngeld,elterng_v,"Anteil der Kinder, deren Vater Elterngeld bezogen hat, an allen anspruchsbegründeten Kindern im Jahr 2021 in %"
+Grundsicherung im Alter insgesamt,grusi_insg,Anteil der Bevölkerung mit Grundsicherung im Alter an den 65-Jährigen und Älteren im Jahr 2023 in %
+Grundsicherung im Alter Frauen,grusi_w,Anteil der weiblichen Bevölkerung mit Grundsicherung im Alter an den weiblichen 65-Jährigen und Älteren im Jahr 2023 in %
+Grundsicherung im Alter Männer,grusi_m,Anteil der männlichen Bevölkerung mit Grundsicherung im Alter an den männlichen 65-Jährigen und Älteren im Jahr 2023 in %
+Soziale Mindestsicherung,sozsich,Anteil der Personen in sozialer Mindestsicherung an allen Einwohnerinnen und Einwohnern im Jahr 2022 in %
+Breitbandversorgung (mindestens 50 Mbit/s),v_breitb50,"Anteil der Haushalte, die mit einer Internetgeschwindigkeit von ≥ 50 Mbit/s versorgt werden können, im Dezember 2023 in %"
+Breitbandversorgung (mindestens 1.000 Mbit/s),v_breitb1000,"Anteil der Haushalte, die mit einer Internetgeschwindigkeit von ≥ 1.000 Mbit/s versorgt werden können, im Dezember 2023 in %"
+Verfügbarkeit von mobilem Breitband (GSM),v_gsm,Mobile Breitbandverfügbarkeit mit GSM in % der Fläche im Jahr 2024
+Verfügbarkeit von mobilem Breitband (LTE),v_lte,Mobile Breitbandverfügbarkeit mit LTE in % der Fläche im Jahr 2024
+Verfügbarkeit von mobilem Breitband (5G),v_5g,Mobile Breitbandverfügbarkeit mit 5G in % der Fläche im Jahr 2024
+Stromkapazitäten aus erneuerbaren Energiequellen,reg_energie,Installierte Nettonennleistung aus erneuerbaren Energiequellen in MW je 1.000 Einwohner/-innen im Jahr 2023
+Pkw-Dichte,auto,Pkw je 1.000 Einwohner/-innen im Jahr 2024
+Pendeldistanzen und Pendlerverflechtungen,pendel,Pendlerverflechtungen zwischen Gemeindeverbänden nach Anzahl der Pendler im Jahr 2023; Durchschnittliche Pendeldistanzen aller SV-Beschäftigten am Wohnort im Jahr 2023 in km
+Erreichbarkeit des Öffentlichen Verkehrs (Haltestellen),oenv,"Anteil der Bevölkerung, die in maximal 600 m bzw. bei Bahnhöfen 1.200 m Luftlinienentfernung um eine Haltestelle mit mindestens 20 Abfahrten im ÖV am Tag wohnt, im Jahr 2020 in %"
+Erreichbarkeit zentraler Orte (Pkw),p_ozmz_miv,Durchschnittliche bevölkerungsgewichtete Pkw-Fahrzeit zum Stadtzentrum des nächsten Ober- oder Mittelzentrums im Jahr 2020 in Minuten
+Erreichbarkeit zentraler Orte (ÖV),p_ozmz_oev,Durchschnittliche bevölkerungsgewichtete ÖV-Reisezeit zum Stadtzentrum des nächsten Ober- oder Mittelzentrums im Jahr 2020 in Minuten
+Erreichbarkeit von Lebensmittelläden,p_markt,Mittlere Pkw-Fahrzeit zum nächsten Supermarkt oder Discounter im Jahr 2021 in Minuten
+Elektro-Pkw im Pkw-Bestand,eauto,Anteil von Pkw mit reinem Elektroantrieb (BEV) an allen Pkw im Jahr 2025 in %
+Öffentliche Ladeinfrastruktur für Elektroautos,elade,Öffentlich zugängliche Ladepunkte für Elektrofahrzeuge im Jahr 2024 je 100.000 Einwohner/-innen
+Erreichbarkeit von Ladestationen für Elektroautos (Normalladestationen),p_nelade,Pkw-Fahrzeit zur nächsten öffentlich zugänglichen Normalladestation für Elektroautos im Jahr 2023 in Minuten
+Erreichbarkeit von Ladestationen für Elektroautos (Schnellladestationen),p_selade,Pkw-Fahrzeit zur nächsten öffentlich zugänglichen Schnellladestation für Elektroautos im Jahr 2023 in Minuten
+Erreichbarkeit von Schwimmbädern (Hallenbäder),p_hbad,Pkw-Fahrzeit zum nächsten Hallenbad im Jahr 2024 in Minuten
+Erreichbarkeit von Schwimmbädern (Natur- oder Freibäder),p_freibad,Pkw-Fahrzeit zum nächsten Natur- oder Freibad im Jahr 2024 in Minuten
+Erreichbarkeit von hausärztlichen Praxen,p_harzt,Mittlere Pkw-Fahrzeit zur nächsten hausärztlichen Praxis im Jahr 2021
+Hausärztliche Versorgung,v_harzt,Hausärzte/-ärztinnen je 100.000 Einwohner/-innen im Jahr 2022
+Kinderärztliche Versorgung,v_karzt,Kinderärzte/-ärztinnen je 100.000 Einwohner/-innen im Alter von unter 15 Jahren im Jahr 2022
+Erreichbarkeit einer zentralen Notaufnahme oder Notfallambulanz,p_notfall,Pkw-Fahrzeit zum nächsten Krankenhaus mit zentraler Notaufnahme oder Notfallambulanz im Jahr 2024 in Minuten
+Erreichbarkeit von Apotheken,p_apo,Mittlere Pkw-Fahrzeit zur nächsten öffentlichen Apotheke im Jahr 2020 in Minuten
+Luftrettung bei Tag,luftrtng,Durchschnittliche Flugzeit durch Luftrettung während des Tages im Jahr 2016 in Minuten
+Ambulante und stationäre Pflege (Ambulante Pflege),pfl_ambu,Anteil der Pflegebedürftigen in ambulanter Pflege an den Pflegebedürftigen insgesamt im Jahr 2021 in %
+Ambulante und stationäre Pflege (Stationäre Pflege),pfl_stat,Anteil der Pflegebedürftigen in stationärer Dauerpflege an den Pflegebedürftigen insgesamt im Jahr 2021 in %
+Pflegegeldempfängerinnen und -empfänger,pfl_geld,Anteil der Pflegegeldempfänger/-innen an den Pflegebedürftigen insgesamt im Jahr 2021 in %
+Erreichbarkeit von Grundschulen,p_grunds,Pkw-Fahrzeit zur nächsten Grundschule in den Jahren 2021-24 in Minuten
+Erreichbarkeit von Schulen bis zur 10. Klasse (Sekundarstufe I),p_sek_1,Pkw-Fahrzeit zur nächsten Schule der Sekundarstufe I in den Jahren 2021-24 in Minuten
+Erreichbarkeit von Schulen mit Sekundarstufe II,p_sek_2,Pkw-Fahrzeit zur nächsten Schule der Sekundarstufe II in den Jahren 2021-24 in Minuten
+Schulabgängerinnen und Schulabgänger ohne Hauptschulabschluss,schule_oabschl,Anteil der Schulabgänger/-innen ohne Hauptschulabschluss an allen Schulabgänger/-innen allgemeinbildender Schulen im Jahr 2022 in %
+Kindertagesbetreuung (Kinder unter 3 Jahren),kbetr_u3,Anteil der betreuten Kinder unter 3 Jahren in Kindertageseinrichtungen/-tagespflege an der Altersgruppe im Jahr 2022 in %
+Kindertagesbetreuung (Kinder ab 3 bis unter 6 Jahren),kbetr_ue3,Anteil der betreuten Kinder ab 3 bis unter 6 Jahren in Kindertageseinrichtungen/-tagespflege an der Altersgruppe im Jahr 2022 in %
+Kindertagesbetreuung (ab 6 bis unter 11 Jahren),kbetr_ue6,Anteil der betreuten Kinder ab 6 bis unter 11 Jahren in Kindertageseinrichtungen/-tagespflege an der Altersgruppe im Jahr 2022 in %
+Betreuungsschlüssel in Kindertageseinrichtungen,kbtr_pers,Plätze in Kindertageseinrichtungen je pädagogisch tätige Person im Jahr 2024
+Kinder in Bedarfsgemeinschaften,kinder_bg,Anteil der unter 15-Jährigen in SGB-II-Bedarfsgemeinschaften an der Altersgruppe im Jahr 2022 in %
+Straftaten,straft,Straftaten insgesamt pro 100.000 Einwohner/-innen im Jahr 2023
+Wohnungseinbrüche,einbr,Fälle von Wohnungseinbruchdiebstahl pro 100.000 Einwohner/-innen im Jahr 2023
+Erreichbarkeit durch die Polizei,p_poli,Mittlere Pkw-Fahrzeit von der nächsten Polizeidienststelle im Jahr 2014 in Minuten

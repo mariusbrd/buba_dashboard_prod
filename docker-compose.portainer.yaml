@@ -1,0 +1,89 @@
+# ============================================================================
+# BuBa Dashboard - Portainer Stack Configuration (Development)
+# ============================================================================
+# Diese Datei ist optimiert für den Einsatz in Portainer.
+# 
+# Verwendung in Portainer:
+# 1. Stacks -> Add Stack
+# 2. Name: buba-dashboard-dev
+# 3. Build method: Repository (empfohlen) oder Web editor
+# 4. Repository: https://github.com/mariusbrd/buba_dashboard.git
+# 5. Compose path: docker-compose.portainer.yaml
+# 6. Deploy
+# ============================================================================
+
+version: '3.8'
+
+services:
+  buba-dev:
+    # Image wird aus dem Development-Repository gebaut
+    image: buba-dashboard:dev
+    container_name: buba-dashboard-dev
+    
+    build:
+      context: .
+      dockerfile: Dockerfile.portainer
+      args:
+        # Development-Repository (nicht Production!)
+        REPO_PATH: "mariusbrd/buba_dashboard"
+        REPO_REF: "main"
+    
+    ports:
+      # Dashboard auf Port 8080 verfügbar
+      - "8080:8080"
+    
+    environment:
+      # Development-spezifische Umgebungsvariablen
+      FLASK_ENV: development
+      SCENARIO_FORCE_REFRESH: "1"
+      TZ: Europe/Berlin
+      PYTHONUNBUFFERED: "1"
+    
+    # Named Volumes für Persistenz (überleben Container-Neustarts)
+    volumes:
+      # User Presets bleiben erhalten
+      - buba_user_presets:/app/forecaster/user_presets
+      # Trainierte Modelle bleiben erhalten
+      - buba_trained_models:/app/forecaster/trained_models
+      # Szenario-Daten bleiben erhalten
+      - buba_scenario_data:/app/scenario/data
+      # Cache-Verzeichnis für API-Daten
+      - buba_cache:/app/loader/financial_cache
+    
+    restart: unless-stopped
+    
+    # Healthcheck für Portainer-Monitoring
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/', timeout=3)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Netzwerk-Alias für interne Kommunikation
+    networks:
+      - buba-network
+    
+    # Labels für Portainer-Organisation
+    labels:
+      - "com.portainer.stack=buba-dashboard-dev"
+      - "org.opencontainers.image.title=BuBa Dashboard (Development)"
+      - "org.opencontainers.image.source=https://github.com/mariusbrd/buba_dashboard"
+      - "org.opencontainers.image.description=Development environment for BuBa Dashboard"
+
+# Named Volumes (werden von Portainer verwaltet)
+volumes:
+  buba_user_presets:
+    name: buba_dev_user_presets
+  buba_trained_models:
+    name: buba_dev_trained_models
+  buba_scenario_data:
+    name: buba_dev_scenario_data
+  buba_cache:
+    name: buba_dev_cache
+
+# Eigenes Netzwerk
+networks:
+  buba-network:
+    name: buba_dev_network
+    driver: bridge

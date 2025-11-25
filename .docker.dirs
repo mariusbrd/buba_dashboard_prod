@@ -1,0 +1,16 @@
+data
+ecbdata
+financial_cache
+forecaster/presets
+forecaster/trained_models
+forecaster/trained_outputs
+forecaster/user_presets
+models_scenario
+overview
+scenario
+scenario/data
+scenario/data_sources
+scenario/models_scenario
+scenario/outputs
+scenario/scenario_cache
+trained_models

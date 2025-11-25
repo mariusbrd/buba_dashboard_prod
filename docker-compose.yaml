@@ -1,0 +1,25 @@
+services:
+  gvb:
+    image: gvb-dashboard:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REPO_PATH: "mariusbrd/buba_dashboard_prod"
+        REPO_REF: "main"
+      secrets:
+        - gh_token
+    ports:
+      - "8080:8080"
+    environment:
+      SCENARIO_FORCE_REFRESH: "1"
+      TZ: Europe/Berlin
+    volumes:
+      - ./forecaster/user_presets:/app/forecaster/user_presets
+      - ./forecaster/trained_models:/app/forecaster/trained_models
+      - ./scenario:/app/scenario
+    restart: unless-stopped
+
+secrets:
+  gh_token:
+    file: ./.gh_token   # <- stelle sicher, dass die Datei so heißt

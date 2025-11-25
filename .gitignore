@@ -1,0 +1,32 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.idea/
+.vscode/
+.gh_token/
+.ghtoken/
+.ghtoken
+.gh_token.gh_token
+.env
+*.pem
+*.pfx
+*.key
+.ghtoken
+.ghtoken
+.gvb_last_refresh
+.scenario_month.stamp
+
+# Data and Cache
+loader/financial_cache/
+loader/gvb_output.parquet
+loader/gvb_output.xlsx
+loader/runs/
+
+# Scenario outputs
+scenario/data/analysis_data.xlsx
+scenario/data/output.xlsx
+
+# Forecaster outputs
+forecaster/trained_models/
+forecaster/trained_outputs/
