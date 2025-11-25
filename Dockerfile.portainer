@@ -1,0 +1,83 @@
+# ============================================================================
+# BuBa Dashboard - Portainer Dockerfile (Development)
+# ============================================================================
+# Optimiert für Portainer - klont Development-Repo direkt von GitHub
+# ============================================================================
+
+# syntax=docker/dockerfile:1.6
+
+# ============================================================================
+# Stage 1: Repository klonen (Development-Repo)
+# ============================================================================
+FROM debian:bookworm-slim AS fetcher
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    git \
+    git-lfs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build-Argumente für Repository
+ARG REPO_PATH="mariusbrd/buba_dashboard"
+ARG REPO_REF="main"
+
+# Repository klonen (Development, nicht Production!)
+RUN set -eux; \
+    git lfs install --system; \
+    git clone --depth 1 --branch "$REPO_REF" "https://github.com/${REPO_PATH}.git" /src; \
+    git -C /src lfs pull || true; \
+    git -C /src rev-parse HEAD > /src/.build_commit
+
+# ============================================================================
+# Stage 2: Runtime Environment
+# ============================================================================
+FROM python:3.11-slim
+
+# Build-Args für Labels
+ARG REPO_PATH="mariusbrd/buba_dashboard"
+ARG REPO_REF="main"
+
+# Metadata Labels
+LABEL org.opencontainers.image.title="BuBa Dashboard (Development)" \
+      org.opencontainers.image.source="https://github.com/${REPO_PATH}" \
+      org.opencontainers.image.revision="${REPO_REF}" \
+      org.opencontainers.image.description="Development environment for BuBa Dashboard"
+
+# Umgebungsvariablen
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    TZ=Europe/Berlin \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Dependencies installieren (mit BuildKit-Cache)
+COPY --from=fetcher /src/requirements.txt /app/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install -r /app/requirements.txt
+
+# Development-Tools installieren (optional, für Debugging)
+RUN pip install ipdb pytest black flake8
+
+# Gesamten Code kopieren
+COPY --from=fetcher /src/ /app/
+
+# Build-Commit-Info verfügbar machen
+RUN cat /app/.build_commit 2>/dev/null || echo "unknown" > /app/.build_commit
+
+# Verzeichnisse für Volumes vorbereiten
+RUN mkdir -p /app/forecaster/user_presets \
+             /app/forecaster/trained_models \
+             /app/scenario/data \
+             /app/loader/financial_cache
+
+# Port exposieren
+EXPOSE 8080
+
+# Healthcheck (einzeilig, prüft ob App läuft)
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=40s \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/', timeout=3)" || exit 1
+
+# Development-Server starten (kein gunicorn, damit Debug-Mode funktioniert)
+CMD ["python", "app.py"]

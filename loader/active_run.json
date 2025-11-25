@@ -1,0 +1,17 @@
+{
+  "run_cache_tag": "ph_ph_wertpapiere_fluss_h6_a90ab68e",
+  "run_loader_dir": "F:\\Dropbox\\Projekte\\BuBa_Antigravity\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251123T161108",
+  "expected_output": "F:\\Dropbox\\Projekte\\BuBa_Antigravity\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251123T161108\\output.xlsx",
+  "requested_exog": [
+    "QSA.Q.N.DE.W0.S1M.S1.N.A.LE.F._Z._Z.XDC._T.S.V.N._T",
+    "QSA.Q.N.DE.W0.S1M.S1._Z.B.B6G._Z._Z._Z.XDC._T.S.V.N._T",
+    "IRS.M.DE.L.L40.CI.0000.EUR.N.Z",
+    "ICP.M.DE.N.000000.4.ANR",
+    "GFS.Q.Y.DE.W0.S13.S1._Z.B.B8G._Z._Z._Z.XDC_R_B1GQ._Z.S.V.N._T"
+  ],
+  "ui_target": "Wertpapiere",
+  "ui_mode": "fluss",
+  "ui_sektor": "PH",
+  "horizon": 6,
+  "created_at": "2025-11-23T16:11:08.413338+00:00"
+}
