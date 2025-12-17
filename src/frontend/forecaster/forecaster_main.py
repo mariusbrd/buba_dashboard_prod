@@ -2584,13 +2584,11 @@ def populate_preset_dropdown_options(
         hc_dict: Dict[str, Dict[str, Any]] = {}
         try:
             all_hc_presets = get_ecb_presets_hydrated()
-            logger.warning("HC Presets, %s", all_hc_presets)
             target_slug = _app_norm_slug(target_value)
             if target_slug and target_slug in all_hc_presets:
                 meta = all_hc_presets[target_slug]
                 title = meta.get("title") or f"H&C {target_slug}"
                 hc_dict[title] = {"id": target_slug}
-                logger.debug(f"[PresetDropdown] H&C-Preset geladen: {title}")
         except Exception as e:
             logger.warning(f"[PresetDropdown] H&C-Presets nicht verfügbar: {e}")
         

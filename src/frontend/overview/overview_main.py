@@ -319,7 +319,7 @@ def initialize_data_stores(pathname, existing_data):
             DM, SS, DS = _DM, _SS, _DS
         except Exception:
             try:
-                from loader.data_manager import DataManager as _DM, StoreSource as _SS, DiskSource as _DS
+                from src.backend.loader.data_manager import DataManager as _DM, StoreSource as _SS, DiskSource as _DS
                 DM, SS, DS = _DM, _SS, _DS
             except Exception as e:
                 logger.error(f"KPI-Fehler (DataManager init): {e}")

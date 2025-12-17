@@ -1,17 +1,13 @@
 {
   "run_cache_tag": "ph_ph_wertpapiere_fluss_h6_a90ab68e",
-  "run_loader_dir": "F:\\Dropbox\\Projekte\\BuBa_Antigravity\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251217T122659",
-  "expected_output": "F:\\Dropbox\\Projekte\\BuBa_Antigravity\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251217T122659\\output.xlsx",
+  "run_loader_dir": "C:\\Users\\Timta\\Documents\\Coding_Projects\\buba_dashboard_prod\\src\\backend\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251217T170443",
+  "expected_output": "C:\\Users\\Timta\\Documents\\Coding_Projects\\buba_dashboard_prod\\src\\backend\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251217T170443\\output.xlsx",
   "requested_exog": [
-    "QSA.Q.N.DE.W0.S1M.S1.N.A.LE.F._Z._Z.XDC._T.S.V.N._T",
-    "QSA.Q.N.DE.W0.S1M.S1._Z.B.B6G._Z._Z._Z.XDC._T.S.V.N._T",
-    "IRS.M.DE.L.L40.CI.0000.EUR.N.Z",
-    "ICP.M.DE.N.000000.4.ANR",
-    "GFS.Q.Y.DE.W0.S13.S1._Z.B.B8G._Z._Z._Z.XDC_R_B1GQ._Z.S.V.N._T"
+    "ICP.M.DE.N.000000.4.ANR"
   ],
   "ui_target": "Wertpapiere",
   "ui_mode": "fluss",
   "ui_sektor": "PH",
   "horizon": 6,
-  "created_at": "2025-12-17T12:26:59.744244+00:00"
+  "created_at": "2025-12-17T17:04:43.674857+00:00"
 }

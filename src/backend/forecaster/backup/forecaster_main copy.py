@@ -2442,11 +2442,8 @@ def populate_preset_dropdown_options(
         )
 
         try:
-            logger.warning("Hello this is a test.")
             from src.frontend.forecaster.forecaster_main import get_ecb_presets_hydrated
-            logger.warning("Hello this is a test.")
         except ImportError:
-            logger.warning("Hello this is a test.")
             logger.warning("[PresetDropdown] get_ecb_presets_hydrated nicht verfügbar")
             def get_ecb_presets_hydrated():
                 return {}
