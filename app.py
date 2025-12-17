@@ -4161,9 +4161,8 @@ def run_startup_preloads():
             force_refresh = os.getenv("SCENARIO_FORCE_REFRESH", "0") == "1"
             
             # Prüfe ob output.xlsx existiert - wenn nicht, erzwinge Download
-            # WICHTIG: config.yaml hat output_path: "data/output.xlsx" (relativ)
-            # → wird zu scenario_path / "data" / "output.xlsx"
-            # Dies matched auch DEFAULT_OUTPUT_XLSX in scenario_dataloader.py
+            # HINWEIS: config.yaml hat output_path: "output.xlsx",
+            # scenario_dataloader._resolve_under_scenario_data() macht daraus /app/scenario/data/output.xlsx
             output_check_path = scenario_path / "data" / "output.xlsx"
             if not output_check_path.exists():
                 lg.warning(f"⚠️ {output_check_path} fehlt – erzwinge Szenario-Download")
@@ -4172,20 +4171,15 @@ def run_startup_preloads():
             lg.info("📥 Szenario Preload (monatlich gesteuert)…")
             if force_refresh or should_run_this_month(scenario_path):
                 cfg = DashDownloadConfig.from_yaml(str(cfg_file))
-
-                # Output relativ zu scenario
+                # HINWEIS: cfg.output_path ist bereits korrekt aufgelöst durch
+                # DashDownloadConfig._resolve_under_scenario_data() → /app/scenario/data/output.xlsx
+                
                 out_path = Path(cfg.output_path)
-                if not out_path.is_absolute():
-                    out_path = scenario_path / out_path
                 out_path.parent.mkdir(parents=True, exist_ok=True)
-                cfg.output_path = str(out_path)
 
                 # Cache relativ zu scenario
                 cache_dir = Path(cfg.cache_dir)
-                if not cache_dir.is_absolute():
-                    cache_dir = scenario_path / cache_dir
                 cache_dir.mkdir(parents=True, exist_ok=True)
-                cfg.cache_dir = str(cache_dir)
 
                 lg.info(f"⏬ Lade Szenario Daten ({cfg.start_date} → {cfg.end_date}) …")
                 runner = DashDataDownloader(
