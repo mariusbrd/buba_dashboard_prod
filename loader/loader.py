@@ -105,7 +105,21 @@ class DataProcessor:
                 raise ValueError("No value column found")
 
         result = pd.DataFrame()
-        result["Datum"] = pd.to_datetime(df[date_col], errors='coerce')
+        
+        # Enhanced Date Parsing for Quarters
+        raw_s = df[date_col].astype(str).str.strip()
+        
+        # If it looks like 2025-Q2, map it yourself before to_datetime
+        # Note: Buba uses YYYY-Q#
+        if raw_s.str.match(r"^\d{4}-Q[1-4]").any():
+             # Map Q1->-01-01, Q2->-04-01, etc.
+             # We use regex replacement for speed/simplicity in this embedded module
+             raw_s = raw_s.astype(str).str.replace(r"-Q1", "-01-01", regex=True)
+             raw_s = raw_s.astype(str).str.replace(r"-Q2", "-04-01", regex=True)
+             raw_s = raw_s.astype(str).str.replace(r"-Q3", "-07-01", regex=True)
+             raw_s = raw_s.astype(str).str.replace(r"-Q4", "-10-01", regex=True)
+
+        result["Datum"] = pd.to_datetime(raw_s, errors='coerce')
         result["value"] = pd.to_numeric(df[value_col], errors='coerce')
         result = result.dropna(subset=["value", "Datum"])
         result = result.sort_values("Datum").reset_index(drop=True)
@@ -174,8 +188,10 @@ class IndexCreator:
         index_data = data_df[['Datum'] + available_codes].copy()
         index_data = index_data.set_index('Datum')
 
-        has_any = index_data[available_codes].notna().any(axis=1)
-        index_data = index_data.loc[has_any].copy()
+        # FIX: Do not drop rows that are all-NaN here, because we might want to ffill into them!
+        # has_any = index_data[available_codes].notna().any(axis=1)
+        # index_data = index_data.loc[has_any].copy()
+        pass
 
         def _fill_inside(s: pd.Series) -> pd.Series:
             if s.notna().sum() == 0:
@@ -185,11 +201,14 @@ class IndexCreator:
                 return s
             filled = s.ffill().bfill()
             mask = (s.index >= first) & (s.index <= last)
-            return filled.where(mask, s)
+            # Fix: Allow robust extension for lagging series (limit 2 periods, e.g. 2 months)
+            inside_fixed = filled.where(mask, s)
+            return inside_fixed.ffill(limit=5)
 
         index_data[available_codes] = index_data[available_codes].apply(_fill_inside)
-        clean_data = index_data.dropna()
-
+        # clean_data = index_data.dropna()
+        clean_data = index_data # robust: allow partial data
+        
         import numpy as np
         if clean_data.empty:
             logger.warning(f"Index '{index_name}': No overlapping data after forward/backfill")
@@ -197,15 +216,18 @@ class IndexCreator:
             result[:] = np.nan
             return result
 
-        weights = {code: 1.0 / len(available_codes) for code in available_codes}
-        weighted_values = [clean_data[c] * weights[c] for c in available_codes if c in clean_data.columns]
+        # weights = {code: 1.0 / len(available_codes) for code in available_codes}
+        # weighted_values = [clean_data[c] * weights[c] for c in available_codes if c in clean_data.columns]
 
-        if not weighted_values:
-            result = pd.Series(index=index_data.index, dtype=float, name=index_name)
-            result[:] = np.nan
-            return result
+        # if not weighted_values:
+        #     result = pd.Series(index=index_data.index, dtype=float, name=index_name)
+        #     result[:] = np.nan
+        #     return result
 
-        aggregated = sum(weighted_values)
+        # aggregated = sum(weighted_values)
+        
+        # Robust aggregation: mean of available signals
+        aggregated = clean_data[available_codes].mean(axis=1)
 
         try:
             base_year_int = int(self.index_base_year)
@@ -225,8 +247,20 @@ class IndexCreator:
             mask = aggregated.notna()
             result[mask] = (aggregated[mask] / base_value_actual) * float(self.index_base_value)
             
+            
             logger.debug(f"Index '{index_name}' created: {len(result)} periods, "
                         f"base={base_value_actual:.2f}, range=[{result.min():.2f}, {result.max():.2f}]")
+            
+            # --- DEBUG INSTRUMENTATION START ---
+            if not result.empty:
+                last_idx = result.last_valid_index()
+                raw_max = index_data.index.max()
+                if last_idx and raw_max and last_idx < raw_max:
+                    logger.warning(f"Index '{index_name}' ends at {last_idx} but raw data goes to {raw_max}. "
+                                   f"Missing periods likely due to dropna() of components: "
+                                   f"{[c for c in available_codes if index_data[c].last_valid_index() < raw_max]}")
+            # --- DEBUG INSTRUMENTATION END ---
+
             return result
         except Exception as e:
             logger.warning(f"Index normalization failed for {index_name}, using raw data: {e}")
@@ -430,14 +464,15 @@ class BundesbankCSVParser:
         if df.empty:
             raise ValueError("No valid data after parsing")
         time_col, value_col = BundesbankCSVParser._identify_columns(df, code)
+        
+        # Fix Critical Alignment Bug: Use row-wise dropna!
+        clean = df.dropna(subset=[time_col, value_col])
+        if clean.empty:
+            raise ValueError("No valid pairs after alignment")
+        
         res = pd.DataFrame()
-        tvals = df[time_col].dropna()
-        vvals = df[value_col].dropna()
-        m = min(len(tvals), len(vvals))
-        if m == 0:
-            raise ValueError("No valid pairs")
-        res["Datum"] = tvals.iloc[:m].astype(str)
-        res["value"] = pd.to_numeric(vvals.iloc[:m], errors="coerce")
+        res["Datum"] = clean[time_col].astype(str)
+        res["value"] = pd.to_numeric(clean[value_col], errors="coerce")
         res = res.dropna()
         if res.empty:
             raise ValueError("No numeric data")
@@ -801,6 +836,20 @@ def _align_to_calendar(merged: pd.DataFrame, start: str, end: str, *,
                        fill_limit: Optional[int] = None) -> pd.DataFrame:
     cal = _build_calendar_index(start, end, freq=freq)
     out = cal.merge(merged, on="Datum", how="left")
+
+    # --- DEBUG INSTRUMENTATION START ---
+    if not out.empty:
+        max_dt = out["Datum"].max()
+        logger.info(f"[_align_to_calendar] Aligned {len(merged)} rows to {start}..{end} ({freq}). Max Date: {max_dt}")
+        # Check specific Q2 check
+        q2_2025 = pd.Timestamp("2025-04-01")
+        if q2_2025 <= max_dt:
+             in_cal = (out["Datum"] == q2_2025).any()
+             in_merged = (merged["Datum"] == q2_2025).any() if "Datum" in merged.columns else False
+             if in_cal and not in_merged:
+                 logger.warning(f"[_align_to_calendar] 2025-04-01 exists in calendar but NOT in merged data!")
+    # --- DEBUG INSTRUMENTATION END ---
+
     if fill in {"ffill", "bfill"}:
         method = "ffill" if fill == "ffill" else "bfill"
         value_cols = [c for c in out.columns if c != "Datum"]
@@ -1006,6 +1055,17 @@ def run_from_config(config_path: str = "config.yaml") -> pd.DataFrame:
                 logger.debug(f"Trimmed {before - len(final_df)} leading target-only rows")
 
     logger.info(f"Final dataset: {final_df.shape[0]} observations × {final_df.shape[1]-1} variables")
+    
+    # --- DEBUG INSTRUMENTATION START ---
+    if "Datum" in final_df.columns and not final_df.empty:
+        last_dt = final_df["Datum"].max()
+        q2_2025 = pd.Timestamp("2025-04-01")
+        has_q2 = (final_df["Datum"] == q2_2025).any()
+        logger.info(f"[Validation] Final Max Date: {last_dt}. Has 2025-04-01? {has_q2}")
+        if not has_q2 and last_dt < q2_2025:
+             logger.warning(f"[Validation] Q2 2025 is MISSING in Final Dataset!")
+    # --- DEBUG INSTRUMENTATION END ---
+
 
     out_path_raw = cfg.get("output_path", "output.xlsx")
     out_path_str = _normalize_loader_path_str(out_path_raw)
@@ -1014,9 +1074,13 @@ def run_from_config(config_path: str = "config.yaml") -> pd.DataFrame:
     # parquet-branch: zusätzlich Multi-Sheet-Excel mit erwarteten Namen
     if out_path.suffix.lower() == ".parquet":
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        final_df.to_parquet(out_path, index=False)
-        logger.info(f"Wrote {out_path.resolve()} (Parquet format)")
+        try:
+            final_df.to_parquet(out_path, index=False)
+            logger.info(f"Wrote {out_path.resolve()} (Parquet format)")
+        except Exception as e:
+            logger.warning(f"Could not write Parquet file (missing pyarrow?): {e}")
 
+        # Continue with Excel companion even if parquet failed (or if we want reliable xlsx fallback)
         xlsx_path = out_path.with_suffix(".xlsx")
         try:
             with pd.ExcelWriter(xlsx_path, engine=get_excel_engine()) as writer:

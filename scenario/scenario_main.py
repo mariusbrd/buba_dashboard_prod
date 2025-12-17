@@ -28,16 +28,111 @@ DEFAULT_OVERRIDES_XLSX = scenario_data_path("scenario_overrides.xlsx")
 # sonst fallback-only.
 # Robust gegen zirkuläre Importe: versuche Foundation-Helper aus app.py zu importieren,
 # sonst fallback-only.
-try:
-    from app import get_quarter_end_date  # nur diese eine Helper-Funktion
-except Exception:
-    def get_quarter_end_date(year: int, quarter: int):
-        import pandas as pd
-        QUARTER_END_MONTH = {1: 3, 2: 6, 3: 9, 4: 12}
-        QUARTER_END_DAY   = {3: 31, 6: 30, 9: 30, 12: 31}
-        m_end = QUARTER_END_MONTH[int(quarter)]
-        d_end = QUARTER_END_DAY[m_end]
-        return pd.Timestamp(int(year), m_end, d_end)
+
+# Robust gegen zirkuläre Importe: wir definieren Helper lokal.
+
+def get_quarter_end_date(year: int, quarter: int):
+    import pandas as pd
+    QUARTER_END_MONTH = {1: 3, 2: 6, 3: 9, 4: 12}
+    QUARTER_END_DAY   = {3: 31, 6: 30, 9: 30, 12: 31}
+    m_end = QUARTER_END_MONTH[int(quarter)]
+    d_end = QUARTER_END_DAY[m_end]
+    return pd.Timestamp(int(year), m_end, d_end)
+
+
+
+
+
+def format_axis_quarters(fig, date_iterable):
+    """
+    Formatiert die X-Achse als KATEGORISCH (String-basiert), um "Qx YYYY"
+    als Header im Hover zu erzwingen, während die visuelle Sortierung erhalten bleibt.
+    Ticks weiterhin nur alle 5 Jahre (z.B. Q1 2020).
+    """
+    try:
+        if date_iterable is None or len(date_iterable) == 0:
+            return
+
+        dt_index = pd.to_datetime(list(date_iterable))
+        if dt_index.empty:
+            return
+
+        min_date = dt_index.min()
+        max_date = dt_index.max()
+        
+        if pd.isna(min_date) or pd.isna(max_date):
+            return
+
+        # 1. Master-Timeline erstellen (Alle Quartale im Bereich)
+        try:
+            start_q = pd.Timestamp(min_date).to_period('Q').start_time
+            end_q = pd.Timestamp(max_date).to_period('Q').end_time
+        except Exception:
+            return
+            
+        full_qs = pd.date_range(start=start_q, end=end_q, freq='QS')
+        if len(full_qs) == 0:
+            return
+
+        # Mapping: Timestamp -> "Qx YYYY"
+        # UND: Erstellen der geordneten Kategorie-Liste
+        def to_q_str(d):
+            return f"Q{d.quarter} {d.year}"
+            
+        category_order = [to_q_str(d) for d in full_qs]
+        
+        # 2. Alle Traces auf String-Werte mappen
+        for trace in fig.data:
+            if getattr(trace, 'x', None) is None:
+                continue
+            try:
+                # Altdaten (Datetimes) zu Strings konvertieren
+                ts_series = pd.to_datetime(pd.Series(trace.x), errors='coerce')
+                # NaT ignorieren/leeren
+                new_x = ts_series.apply(lambda x: to_q_str(x) if pd.notna(x) else None).tolist()
+                trace.x = new_x
+                
+                # Hovertemplate bereinigen (Header macht jetzt den Job)
+                trace.hovertemplate = "%{fullData.name}: %{y}<extra></extra>"
+            except Exception:
+                pass
+
+        # 3. Ticks berechnen (5 Jahres Abstand)
+        min_year = min_date.year
+        max_year = max_date.year
+        tick_vals = []
+        
+        years = range(min_year, max_year + 1)
+        span = max_year - min_year
+        
+        target_years = []
+        if span >= 5:
+            target_years = [y for y in years if y % 5 == 0]
+        else:
+            target_years = list(years)
+            
+        # Wir setzen den Tick genau auf das String-Label "Q1 YYYY"
+        for y in target_years:
+            val = f"Q1 {y}"
+            if val in category_order:
+                tick_vals.append(val)
+        
+        # 4. Layout Update
+        fig.update_xaxes(
+            type='category',
+            categoryorder='array',
+            categoryarray=category_order,
+            
+            tickmode='array',
+            tickvals=tick_vals,
+            tickangle=0
+        )
+            
+    except Exception:
+        pass
+
+
+
 
 # ➜ NEU: parse_german_number hier verfügbar machen (Import + Fallback)
 try:
@@ -431,6 +526,11 @@ def show_initial_historical_view(pathname, target_ui, reset_clicks):
                 'borderpad': 10
             }]
         )
+
+        try:
+             format_axis_quarters(fig, df_hist["Datum"])
+        except Exception:
+             pass
         
         return fig
         
@@ -791,6 +891,11 @@ def run_scenario_forecast_with_analyzer(n_clicks, target_ui, tbl_cols, tbl_rows,
                 hovermode="x unified",
                 height=560,
             )
+            try:
+                format_axis_quarters(fig, hist_x + fut_dates_expected)
+            except Exception:
+                pass
+
             if hist_x:
                 cutoff = pd.to_datetime(max(hist_x)).to_pydatetime()
                 fig.add_shape(
@@ -1062,6 +1167,11 @@ def run_scenario_forecast_with_analyzer(n_clicks, target_ui, tbl_cols, tbl_rows,
             hovermode="x unified",
             height=560,
         )
+        try:
+            format_axis_quarters(fig, hist_x + fut_dates_expected)
+        except Exception:
+            pass
+
         if hist_x:
             cutoff = pd.to_datetime(max(hist_x)).to_pydatetime()
             fig.add_shape(

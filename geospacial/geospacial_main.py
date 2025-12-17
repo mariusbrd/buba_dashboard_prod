@@ -36,6 +36,102 @@ from forecaster.forecaster_main import (  # NEU
     RUNS_DIR,
 )
 
+
+
+
+
+def format_axis_quarters(fig, date_iterable):
+    """
+    Formatiert die X-Achse als KATEGORISCH (String-basiert), um "Qx YYYY"
+    als Header im Hover zu erzwingen, während die visuelle Sortierung erhalten bleibt.
+    Ticks weiterhin nur alle 5 Jahre (z.B. Q1 2020).
+    """
+    try:
+        if date_iterable is None or len(date_iterable) == 0:
+            return
+
+        dt_index = pd.to_datetime(list(date_iterable))
+        if dt_index.empty:
+            return
+
+        min_date = dt_index.min()
+        max_date = dt_index.max()
+        
+        if pd.isna(min_date) or pd.isna(max_date):
+            return
+
+        # 1. Master-Timeline erstellen (Alle Quartale im Bereich)
+        try:
+            start_q = pd.Timestamp(min_date).to_period('Q').start_time
+            end_q = pd.Timestamp(max_date).to_period('Q').end_time
+        except Exception:
+            return
+            
+        full_qs = pd.date_range(start=start_q, end=end_q, freq='QS')
+        if len(full_qs) == 0:
+            return
+
+        # Mapping: Timestamp -> "Qx YYYY"
+        # UND: Erstellen der geordneten Kategorie-Liste
+        def to_q_str(d):
+            return f"Q{d.quarter} {d.year}"
+            
+        category_order = [to_q_str(d) for d in full_qs]
+        
+        # 2. Alle Traces auf String-Werte mappen
+        for trace in fig.data:
+            if getattr(trace, 'x', None) is None:
+                continue
+            try:
+                # Altdaten (Datetimes) zu Strings konvertieren
+                ts_series = pd.to_datetime(pd.Series(trace.x), errors='coerce')
+                # NaT ignorieren/leeren
+                new_x = ts_series.apply(lambda x: to_q_str(x) if pd.notna(x) else None).tolist()
+                trace.x = new_x
+                
+                # Hovertemplate bereinigen (Header macht jetzt den Job)
+                trace.hovertemplate = "%{fullData.name}: %{y}<extra></extra>"
+            except Exception:
+                pass
+
+        # 3. Ticks berechnen (5 Jahres Abstand)
+        min_year = min_date.year
+        max_year = max_date.year
+        tick_vals = []
+        
+        years = range(min_year, max_year + 1)
+        span = max_year - min_year
+        
+        target_years = []
+        if span >= 5:
+            target_years = [y for y in years if y % 5 == 0]
+        else:
+            target_years = list(years)
+            
+        # Wir setzen den Tick genau auf das String-Label "Q1 YYYY"
+        for y in target_years:
+            val = f"Q1 {y}"
+            if val in category_order:
+                tick_vals.append(val)
+        
+        # 4. Layout Update
+        fig.update_xaxes(
+            type='category',
+            categoryorder='array',
+            categoryarray=category_order,
+            
+            tickmode='array',
+            tickvals=tick_vals,
+            tickangle=0
+        )
+            
+    except Exception:
+        pass
+
+
+
+
+
 # Leere Standardkarte für Initialzustand
 EMPTY_GEO_MAP_HTML = build_empty_map(
     level="krs",
@@ -3258,6 +3354,12 @@ def register_geo_callbacks(app):
                 x=1,
             ),
         )
+
+        try:
+            format_axis_quarters(fig, df[date_col])
+        except Exception:
+            pass
+
 
         return fig
 
