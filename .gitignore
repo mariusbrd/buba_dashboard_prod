@@ -26,7 +26,10 @@ src/backend/loader/runs/
 # Scenario outputs
 src/frontend/scenario/data/analysis_data.xlsx
 src/frontend/scenario/data/output.xlsx
+src/frontend/scenario/scenario_cache/
+src/frontend/forecaster/presets/
 
 # Forecaster outputs
 src/backend/forecaster/trained_models/
 src/backend/forecaster/trained_outputs/
+

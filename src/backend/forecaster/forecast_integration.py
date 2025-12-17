@@ -146,7 +146,7 @@ except Exception as e1:
             except Exception as e4:
                 try:
                     # 5) Absoluter Import mit forecaster-Prefix
-                    from src.forecaster.forecaster_pipeline import (  # type: ignore
+                    from src.backend.forecaster.forecaster_pipeline import (  # type: ignore
                         PipelineConfig,
                         run_production_pipeline,
                         ModelArtifact,
@@ -158,7 +158,7 @@ except Exception as e1:
                 except Exception as e5:
                     try:
                         # 6) Absoluter Import mit forecaster-Prefix + Config-Alias
-                        from src.forecaster.forecaster_pipeline import (  # type: ignore
+                        from src.backend.forecaster.forecaster_pipeline import (  # type: ignore
                             Config as PipelineConfig,
                             run_production_pipeline,
                             ModelArtifact,
@@ -166,7 +166,7 @@ except Exception as e1:
                         )
 
                         HAS_PIPELINE = True
-                        LOGGER.info("[Pipeline] ✓ Import erfolgreich (forecaster.forecaster_pipeline, Config → PipelineConfig)")
+                        LOGGER.info("[Pipeline] ✓ Import erfolgreich (src.frontend.forecaster.forecaster_pipeline, Config → PipelineConfig)")
                     except Exception as e6:
                         # Alle Versuche fehlgeschlagen → Flags setzen und Fehler protokollieren
                         HAS_PIPELINE = False

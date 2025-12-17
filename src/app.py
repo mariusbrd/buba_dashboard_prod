@@ -1881,7 +1881,7 @@ except ImportError as e:
     HAS_INSTRUCTOR = False
     logger.warning(f"⚠️ exog_instructor konnte nicht importiert werden: {e}")
 # --- Scenario-Downloader Integration (beim App-Start) ---
-scenario_path = Path(__file__).parent / "scenario"
+scenario_path = Path(__file__).parent / "frontend/scenario"
 if str(scenario_path) not in sys.path:
     sys.path.insert(0, str(scenario_path))
 
@@ -2067,7 +2067,7 @@ def load_gvb_excel_or_build() -> pathlib.Path | None:
     die neu erzeugte Datei zurückgegeben.
     """
     current_dir = APP_ROOT
-    loader_dir = current_dir / "loader"
+    loader_dir = current_dir / "backend/loader"
 
     # 1) bekannte Orte durchgehen – jetzt mit Parquet ganz oben
     candidates = [
@@ -2213,7 +2213,7 @@ def ensure_monthly_gvb_refresh() -> Path | None:
     - gibt den Pfad zur (neu) erzeugten gvb_output.* zurück, wenn vorhanden
     """
     base_dir = APP_ROOT
-    loader_dir = base_dir / "loader"
+    loader_dir = base_dir / "backend/loader"
     marker_file = loader_dir / ".gvb_last_refresh"
 
     current_month = datetime.today().strftime("%Y-%m")
@@ -4149,7 +4149,7 @@ def run_startup_preloads():
         try:
             # WICHTIG: Wir nutzen die Logik aus scenario_main, da diese
             # output.xlsx -> analysis_data.xlsx konvertieren kann.
-            from scenario.scenario_main import ensure_analysis_data_on_startup as _ensure_analysis
+            from src.frontend.scenario.scenario_main import ensure_analysis_data_on_startup as _ensure_analysis
             _ensure_analysis()
         except Exception as e:
             lg.warning(f"⚠️ Konnte scenario Analyse Daten nicht initialisieren: {e}")

@@ -60,7 +60,7 @@ except Exception:
 
 # Farben/Theming
 try:
-    from main.app import GVB_COLORS, GVB_COLOR_SEQUENCE, BRAND_COLOR
+    from app import GVB_COLORS, GVB_COLOR_SEQUENCE, BRAND_COLOR
 except Exception:
     GVB_COLORS = {
         'Gesamt GVB': '#14324E',
@@ -185,7 +185,7 @@ HCPRESET_CACHE_FILE = PRESETS_DIR / "hc_presets_cache.json"
 # ==============================================================================
 
 try:
-    from main.app import logger as APP_LOGGER
+    from app import logger as APP_LOGGER
 except Exception:
     APP_LOGGER = None
 
@@ -201,7 +201,7 @@ logger.propagate = False
 
 # Log-Adapter
 try:
-    from main.app import Log as _AppLog
+    from app import Log as _AppLog
     Log = _AppLog
 except Exception:
     class Log:
@@ -2568,14 +2568,14 @@ def populate_preset_dropdown_options(
     target_value: Optional[str]
 ):
     try:
-        from main.app import (
+        from src.app import (
             _load_user_presets_from_disk,
             merge_hc_and_user_presets_for_dropdown,
             _normalize_target_slug as _app_norm_slug,
         )
 
         try:
-            from forecaster_main import get_ecb_presets_hydrated
+            from src.frontend.forecaster.forecaster_main import get_ecb_presets_hydrated
         except ImportError:
             logger.warning("[PresetDropdown] get_ecb_presets_hydrated nicht verfügbar")
             def get_ecb_presets_hydrated():
@@ -2584,6 +2584,7 @@ def populate_preset_dropdown_options(
         hc_dict: Dict[str, Dict[str, Any]] = {}
         try:
             all_hc_presets = get_ecb_presets_hydrated()
+            logger.warning("HC Presets, %s", all_hc_presets)
             target_slug = _app_norm_slug(target_value)
             if target_slug and target_slug in all_hc_presets:
                 meta = all_hc_presets[target_slug]
@@ -2632,7 +2633,7 @@ def apply_preset_to_model_store(selected_value: Optional[str]):
         raise PreventUpdate
     
     try:
-        from main.app import _load_user_presets_from_disk
+        from app import _load_user_presets_from_disk
         if not str(selected_value).startswith("user_"):
             logger.debug("[ApplyPreset] Kein User-Preset")
             raise PreventUpdate
@@ -2739,7 +2740,7 @@ def save_preset_with_name(n_clicks, preset_name, target_value, exog_values,
         raise PreventUpdate
     
     try:
-        from main.app import create_user_preset_from_ui_state, upsert_user_preset
+        from app import create_user_preset_from_ui_state, upsert_user_preset
         
         logger.debug("[SavePresetModal] Speichervorgang gestartet")
         
@@ -2871,7 +2872,7 @@ def delete_selected_preset(n_clicks, dropdown_value, user_presets):
         updated.pop(key_to_remove, None)
 
     try:
-        from main.app import delete_user_preset
+        from app import delete_user_preset
         updated = delete_user_preset(preset_identifier=pid, delete_files=False) or updated
     except Exception:
         pass
