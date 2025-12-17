@@ -68,6 +68,12 @@ FORECASTER_DIR = Path(__file__).parent.resolve()
 # Das Root-Verzeichnis (parent von forecaster/)
 ROOT_DIR = FORECASTER_DIR.parent.resolve()
 
+# Kompatibel zu app.py: App-Root des Projekts
+try:
+    APP_ROOT: Path = ROOT_DIR
+except Exception:
+    APP_ROOT = Path.cwd()
+
 # Beide Verzeichnisse zum Python-Pfad hinzufügen (falls nicht bereits vorhanden)
 for path_to_add in [str(FORECASTER_DIR), str(ROOT_DIR)]:
     if path_to_add not in sys.path:
@@ -92,7 +98,7 @@ run_production_pipeline = None  # type: ignore[assignment]
 # Wir versuchen mehrere Varianten in sicherer Reihenfolge
 try:
     # 1) Direkter Import (jetzt mit Pfad-Fix)
-    from forecaster_pipeline import (  # type: ignore
+    from src.forecaster.forecaster_pipeline import (  # type: ignore
         PipelineConfig,
         run_production_pipeline,
         ModelArtifact,
@@ -104,7 +110,7 @@ try:
 except Exception as e1:
     try:
         # 2) Alternativ: Config heißt 'Config' in manchen Repos
-        from forecaster_pipeline import (  # type: ignore
+        from src.forecaster.forecaster_pipeline import (  # type: ignore
             Config as PipelineConfig,
             run_production_pipeline,
             ModelArtifact,
@@ -140,7 +146,7 @@ except Exception as e1:
             except Exception as e4:
                 try:
                     # 5) Absoluter Import mit forecaster-Prefix
-                    from forecaster.forecaster_pipeline import (  # type: ignore
+                    from src.forecaster.forecaster_pipeline import (  # type: ignore
                         PipelineConfig,
                         run_production_pipeline,
                         ModelArtifact,
@@ -152,7 +158,7 @@ except Exception as e1:
                 except Exception as e5:
                     try:
                         # 6) Absoluter Import mit forecaster-Prefix + Config-Alias
-                        from forecaster.forecaster_pipeline import (  # type: ignore
+                        from src.forecaster.forecaster_pipeline import (  # type: ignore
                             Config as PipelineConfig,
                             run_production_pipeline,
                             ModelArtifact,
@@ -174,7 +180,7 @@ except Exception as e1:
                         LOGGER.error("=" * 80)
                         LOGGER.error("[Pipeline] ❌ ALLE Import-Versuche fehlgeschlagen!")
                         LOGGER.error(f"[Pipeline] Forecaster-Dir: {FORECASTER_DIR}")
-                        LOGGER.error(f"[Pipeline] Root-Dir: {ROOT_DIR}")
+                        LOGGER.error(f"[Pipeline] Root-Dir (APP_ROOT): {APP_ROOT}")
                         LOGGER.error(f"[Pipeline] Aktuelles Verzeichnis: {Path.cwd()}")
                         LOGGER.error(f"[Pipeline] Python-Pfad (erste 5): {sys.path[:5]}")
                         LOGGER.error("=" * 80)
@@ -240,11 +246,22 @@ class DashboardForecastAdapter:
     # ------------------------------------------------------------
     # Init
     # ------------------------------------------------------------
-    def __init__(self, gvb_store_json: str, exog_store_json: str):
+
+    def __init__(
+        self,
+        gvb_store_json: str,
+        exog_store_json: str,
+        custom_final_dataset: Optional[Union[dict, str]] = None,
+    ):
         # GVB laden
         self.gvb_data = pd.read_json(gvb_store_json, orient="split")
         self.gvb_data["date"] = pd.to_datetime(self.gvb_data["date"], errors="coerce")
-        self.gvb_data = self.gvb_data.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+        self.gvb_data = (
+            self.gvb_data
+            .dropna(subset=["date"])
+            .sort_values("date")
+            .reset_index(drop=True)
+        )
 
         # Exogene laden (robust)
         self.exog_data = self._load_exog_frame(exog_store_json)
@@ -259,15 +276,36 @@ class DashboardForecastAdapter:
             cache_df = self._load_exog_from_default_cache()
             if not cache_df.empty:
                 self.exog_data = cache_df
-                LOGGER.info("[Adapter|Exog] Cache-Fallback beim Init verwendet (loader/financial_cache/output.xlsx).")
+                LOGGER.info(
+                    "[Adapter|Exog] Cache-Fallback beim Init verwendet "
+                    "(loader/financial_cache/output.xlsx)."
+                )
 
         LOGGER.info(
-            f"[Adapter|Exog] Frame: shape={self.exog_data.shape if hasattr(self, 'exog_data') else None}"
+            f"[Adapter|Exog] Frame: shape="
+            f"{self.exog_data.shape if hasattr(self, 'exog_data') else None}"
         )
         if not self.exog_data.empty:
-            LOGGER.info(f"[Adapter|Exog] Columns (Top): {self.exog_data.columns.tolist()[:12]}")
+            LOGGER.info(
+                f"[Adapter|Exog] Columns (Top): "
+                f"{self.exog_data.columns.tolist()[:12]}"
+            )
             if "date" not in self.exog_data.columns:
-                LOGGER.warning("[Adapter|Exog] Achtung: 'date' Spalte fehlt im Exog-Frame!")
+                LOGGER.warning(
+                    "[Adapter|Exog] Achtung: 'date' Spalte fehlt im Exog-Frame!"
+                )
+
+        # Optional: benutzerdefiniertes PIPELINE_PREP aus Upload
+        self.custom_prepared_df: Optional[pd.DataFrame] = self._load_custom_prepared_df(
+            custom_final_dataset
+        )
+        if self.custom_prepared_df is not None:
+            LOGGER.info(
+                _sym(
+                    f"[Adapter] Custom PIPELINE_PREP aktiv – "
+                    f"shape={self.custom_prepared_df.shape}"
+                )
+            )
 
         # für Debug/Summary
         self.pipeline_info: Dict[str, object] = {}
@@ -297,6 +335,7 @@ class DashboardForecastAdapter:
             self._input_diagnostics = diag
         except Exception as _e:
             LOGGER.warning(f"[DIAG|INPUT] übersprungen: {_e}")
+
 
 
 
@@ -1343,7 +1382,7 @@ class DashboardForecastAdapter:
                 if X_train is None or y_train is None or dates_train is None:
                     LOGGER.info("[Backtest] Training-Daten nicht in Artifact, extrahiere aus prepared_df")
                     try:
-                        from forecaster_pipeline import (  # type: ignore
+                        from src.forecaster.forecaster_pipeline import (  # type: ignore
                             aggregate_to_quarter,
                             add_deterministic_features,
                             build_quarterly_lags,
@@ -1590,6 +1629,82 @@ class DashboardForecastAdapter:
         except Exception as _e_cache:
             LOGGER.warning(f"[Adapter|Exog] Cache-Fallback konnte nicht geladen werden: {_e_cache}")
             return pd.DataFrame()
+
+    @staticmethod
+    def _load_custom_prepared_df(
+        payload: Optional[Union[dict, str]]
+    ) -> Optional[pd.DataFrame]:
+        """
+        Lädt ein benutzerdefiniertes PIPELINE_PREP-DataFrame aus dem
+        custom-final-dataset-store.
+
+        Erwartet ein Dict der Form:
+            {
+                "filename": "...",
+                "uploaded_at": "...",
+                "sheet_name": "...",
+                "json": "<df.to_json(orient='split')>"
+            }
+        oder direkt einen JSON-String im Split-Format.
+        """
+        if payload is None:
+            return None
+
+        try:
+            obj: dict
+            if isinstance(payload, str):
+                # könnte bereits ein JSON-String sein
+                try:
+                    obj = json.loads(payload)
+                except Exception:
+                    # oder direkt df.to_json(...)
+                    df = pd.read_json(payload, orient="split")
+                    return df
+            elif isinstance(payload, dict):
+                obj = payload
+            else:
+                LOGGER.warning(
+                    "[Adapter] custom_final_dataset hat unerwarteten Typ: %r", type(payload)
+                )
+                return None
+
+            df_json = obj.get("json")
+            if not df_json:
+                LOGGER.warning(
+                    "[Adapter] custom_final_dataset ohne 'json'-Feld – wird ignoriert."
+                )
+                return None
+
+            df = pd.read_json(df_json, orient="split")
+
+            if df.empty:
+                LOGGER.warning("[Adapter] custom_final_dataset ist leer.")
+                return None
+
+            # Datumsspalte normalisieren
+            if "date" not in df.columns:
+                for cand in ("Datum", "DATE", "Date", "ds", "time", "Time"):
+                    if cand in df.columns:
+                        df = df.rename(columns={cand: "date"})
+                        break
+
+            if "date" not in df.columns:
+                LOGGER.warning(
+                    "[Adapter] custom_final_dataset hat keine 'date'/'Datum' Spalte – "
+                    "wird ignoriert."
+                )
+                return None
+
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+
+            return df
+
+        except Exception as e:
+            LOGGER.warning(
+                "[Adapter] Konnte custom_final_dataset nicht laden/parsen: %s", e
+            )
+            return None
 
     @staticmethod
     def _make_cache_tag(
@@ -2071,7 +2186,8 @@ class DashboardForecastAdapter:
                 out.loc[per] = threshold
 
         return out
-
+    
+    
     def prepare_pipeline_data(
         self,
         target: str,
@@ -2082,6 +2198,8 @@ class DashboardForecastAdapter:
     ) -> pd.DataFrame:
         """
         KORREKTUR: Verwendet nun _resolve_exogs_in_df für robustes Exog-Matching.
+        Optional: nutzt ein benutzerdefiniertes PIPELINE_PREP DataFrame,
+        falls über custom-final-dataset-store geladen.
         """
         data_type = "fluss" if use_flows else "bestand"
         value_col = "fluss" if use_flows else "bestand"
@@ -2093,6 +2211,79 @@ class DashboardForecastAdapter:
             f"{self.exog_data.columns.tolist()[:12] if not self.exog_data.empty else []}"
         )
 
+        # ------------------------------------------------------------------
+        # 0) Spezialfall: benutzerdefiniertes PIPELINE_PREP aus Upload
+        # ------------------------------------------------------------------
+        custom_df = getattr(self, "custom_prepared_df", None)
+        if custom_df is not None and isinstance(custom_df, pd.DataFrame) and not custom_df.empty:
+            df = custom_df.copy()
+
+            # Datumsspalte normalisieren
+            if "date" not in df.columns:
+                for cand in ("Datum", "Date", "DATE", "ds", "time", "Time"):
+                    if cand in df.columns:
+                        df = df.rename(columns={cand: "date"})
+                        break
+
+            if "date" not in df.columns:
+                raise ValueError(
+                    "[Adapter] Custom-Dataset hat keine 'date' oder 'Datum' Spalte. "
+                    "Bitte das unveränderte PIPELINE_PREP-Sheet als Grundlage verwenden."
+                )
+
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+
+            # Zielspalte identifizieren, falls noch nicht 'target_value'
+            if "target_value" not in df.columns:
+                non_date = [c for c in df.columns if c != "date"]
+                numeric_candidates = [
+                    c
+                    for c in non_date
+                    if pd.to_numeric(df[c], errors="coerce").notna().any()
+                ]
+                if numeric_candidates:
+                    df = df.rename(columns={numeric_candidates[0]: "target_value"})
+
+            if "target_value" not in df.columns:
+                raise ValueError(
+                    "[Adapter] Custom-Dataset enthält keine Zielspalte 'target_value' "
+                    "und keine numerische Spalte, die automatisch zugeordnet werden konnte."
+                )
+
+            exog_cols_only = [c for c in df.columns if c not in ("date", "target_value")]
+
+            tgt_non_null = df["target_value"].dropna()
+            tmin = float(tgt_non_null.min()) if not tgt_non_null.empty else np.nan
+            tmax = float(tgt_non_null.max()) if not tgt_non_null.empty else np.nan
+
+            LOGGER.info(
+                _sym(
+                    f"[Adapter] Verwende benutzerdefiniertes PIPELINE_PREP (Upload). "
+                    f"rows={len(df)}, exog_cols={exog_cols_only[:10]}{'...' if len(exog_cols_only) > 10 else ''}"
+                )
+            )
+
+            pi = getattr(self, "pipeline_info", {}) or {}
+            pi.setdefault("ui_target", target)
+            pi.update(
+                {
+                    "custom_prepared": True,
+                    "prepared_rows": int(len(df)),
+                    "prepared_exog_cols": exog_cols_only,
+                    "target_min": tmin,
+                    "target_max": tmax,
+                    "data_type": data_type,
+                    "use_flows": use_flows,
+                }
+            )
+            self.pipeline_info = pi
+
+            return df
+
+        # ------------------------------------------------------------------
+        # 1) Standardpfad: Aggregation aus GVB + Exog Store
+        # ------------------------------------------------------------------
         if target == "gesamt":
             base = self.gvb_data[self.gvb_data["datatype"] == data_type]
             target_data = base.groupby("date", as_index=False)[value_col].sum()
@@ -2103,9 +2294,18 @@ class DashboardForecastAdapter:
 
         target_data = target_data.rename(columns={value_col: "target_value"})
         target_data["date"] = pd.to_datetime(target_data["date"], errors="coerce")
-        target_data = target_data.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+        target_data = (
+            target_data.dropna(subset=["date"])
+            .sort_values("date")
+            .reset_index(drop=True)
+        )
 
-        tq = target_data.set_index("date")["target_value"].to_period("Q").groupby(level=0).last()
+        tq = (
+            target_data.set_index("date")["target_value"]
+            .to_period("Q")
+            .groupby(level=0)
+            .last()
+        )
 
         tq = self._cap_seasonal_quarter_lows(
             tq,
@@ -2122,26 +2322,38 @@ class DashboardForecastAdapter:
         monthly_index_hist = pd.date_range(start=start_ms, end=end_ms, freq="MS")
 
         target_monthly = tq_start.reindex(monthly_index_hist).ffill()
-        target_monthly_df = target_monthly.rename("target_value").rename_axis("date").reset_index()
+        target_monthly_df = (
+            target_monthly.rename("target_value")
+            .rename_axis("date")
+            .reset_index()
+        )
 
-        # ============================================================================
+        # ====================================================================
         # KORRIGIERTER TEIL: Exog-Resolution mit _resolve_exogs_in_df
-        # ============================================================================
+        # ====================================================================
         resolved_exog_map: dict[str, str] = {}
         if selected_exog and not self.exog_data.empty:
             if "date" not in self.exog_data.columns:
-                LOGGER.warning("[Adapter] Exog-Frame hat keine 'date'-Spalte – Exogs werden übersprungen.")
+                LOGGER.warning(
+                    "[Adapter] Exog-Frame hat keine 'date'-Spalte – Exogs werden übersprungen."
+                )
                 exog_monthly = pd.DataFrame({"date": monthly_index_hist})
             else:
                 # Verwende die zentrale _resolve_exogs_in_df Funktion
-                resolved_exog_map = self._resolve_exogs_in_df(selected_exog, self.exog_data)
-                
-                missing_exogs = [req for req in selected_exog if req not in resolved_exog_map]
-                
+                resolved_exog_map = self._resolve_exogs_in_df(
+                    selected_exog,
+                    self.exog_data,
+                )
+
+                missing_exogs = [
+                    req for req in selected_exog if req not in resolved_exog_map
+                ]
+
                 if missing_exogs:
                     LOGGER.warning(
-                        "[Adapter] Einige gewünschte exogene Variablen wurden im exog_data-Frame nicht gefunden "
-                        f"(auch nicht als __last): {missing_exogs}"
+                        "[Adapter] Einige gewünschte exogene Variablen wurden im "
+                        "exog_data-Frame nicht gefunden (auch nicht als __last): "
+                        f"{missing_exogs}"
                     )
 
                 if resolved_exog_map:
@@ -2149,16 +2361,22 @@ class DashboardForecastAdapter:
                     available_exog = list(dict.fromkeys(resolved_exog_map.values()))
                     LOGGER.info(
                         _sym(
-                            f"[Adapter] Füge {len(available_exog)} exogene Variablen hinzu (aufgelöst): {available_exog}"
+                            f"[Adapter] Füge {len(available_exog)} exogene Variablen "
+                            f"hinzu (aufgelöst): {available_exog}"
                         )
                     )
 
                     exog_monthly = self.exog_data[["date"] + available_exog].copy()
-                    exog_monthly["date"] = pd.to_datetime(exog_monthly["date"], errors="coerce")
+                    exog_monthly["date"] = pd.to_datetime(
+                        exog_monthly["date"],
+                        errors="coerce",
+                    )
                     exog_monthly = exog_monthly.dropna(subset=["date"])
 
                     exog_monthly["date"] = self._to_ms(exog_monthly["date"])
-                    exog_monthly = exog_monthly.groupby("date", as_index=False).last()
+                    exog_monthly = (
+                        exog_monthly.groupby("date", as_index=False).last()
+                    )
 
                     # Stelle sicher, dass alle Spalten ein __last Suffix haben
                     rename_dict = {}
@@ -2172,16 +2390,24 @@ class DashboardForecastAdapter:
 
                     future_months = int(horizon_quarters or 0) * 3
                     if future_months > 0:
-                        exog_monthly = self._extend_exogs_to_future_ms(exog_monthly, future_months)
+                        exog_monthly = self._extend_exogs_to_future_ms(
+                            exog_monthly,
+                            future_months,
+                        )
 
-                    LOGGER.debug(f"[Adapter] Exog-Spalten nach Projection: {exog_monthly.columns.tolist()}")
+                    LOGGER.debug(
+                        f"[Adapter] Exog-Spalten nach Projection: "
+                        f"{exog_monthly.columns.tolist()}"
+                    )
                 else:
                     exog_monthly = pd.DataFrame({"date": monthly_index_hist})
         else:
             exog_monthly = pd.DataFrame({"date": monthly_index_hist})
 
-        result = pd.merge(target_monthly_df, exog_monthly, on="date", how="left").sort_values("date").reset_index(
-            drop=True
+        result = (
+            pd.merge(target_monthly_df, exog_monthly, on="date", how="left")
+            .sort_values("date")
+            .reset_index(drop=True)
         )
 
         exog_cols_only = [c for c in result.columns if c not in ["date", "target_value"]]
@@ -2195,10 +2421,14 @@ class DashboardForecastAdapter:
         LOGGER.info(_sym("\n[Adapter] Pipeline-Daten (MS-normalisiert + Exog-Forecast):"))
         LOGGER.info(f"  Input-Quartale: {tq.shape[0]}")
         LOGGER.info(
-            f"  Output-Monate:  {len(result)}  (inkl. Exog-Zukunft: +{int(horizon_quarters) * 3 if horizon_quarters else 0}M)"
+            f"  Output-Monate:  {len(result)}  "
+            f"(inkl. Exog-Zukunft: +{int(horizon_quarters) * 3 if horizon_quarters else 0}M)"
         )
         LOGGER.info(f"  Target-Range:  {tmin:.3f} - {tmax:.3f}")
-        LOGGER.info(f"  Exog-Spalten:  {exog_cols_only[:10]}{'...' if len(exog_cols_only) > 10 else ''}")
+        LOGGER.info(
+            f"  Exog-Spalten:  {exog_cols_only[:10]}"
+            f"{'...' if len(exog_cols_only) > 10 else ''}"
+        )
         if result.isna().sum().sum() > 0:
             nz = result.isna().sum()
             LOGGER.warning(f"  NaN nach Merge: {dict(nz[nz > 0])}")
@@ -2217,14 +2447,13 @@ class DashboardForecastAdapter:
                 "exog_cols": exog_cols_only,
                 "data_type": data_type,
                 "use_flows": use_flows,
-                "exog_resolved_from_prepare": resolved_exog_map,  # Speichere das Mapping
+                "exog_resolved_from_prepare": resolved_exog_map,
             }
         )
         self.pipeline_info = pi
 
         return result
 
-    
     def create_temp_excel(
         self,
         df: pd.DataFrame,
@@ -3160,7 +3389,7 @@ class DashboardForecastAdapter:
     def get_available_models() -> List[str]:
         """Listet verfügbare Modelle (für UI-Dialog)."""
         try:
-            from forecaster_pipeline import list_saved_models  # type: ignore
+            from src.forecaster.forecaster_pipeline import list_saved_models  # type: ignore
 
             return list_saved_models()
         except Exception:

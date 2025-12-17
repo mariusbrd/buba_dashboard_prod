@@ -23,23 +23,9 @@ DOCKER_COMPOSE := docker-compose
 APP_NAME := gvb-dashboard
 PORT := 8080
 
-# # ============================================================================
-# # Hilfe und Dokumentation
-# # ============================================================================
+PROJECT_DIR := $(dir $(abspath $(firstword $(MAKEFILE_LIST))))
+WORKSPACE=${PROJECT_DIR}/data/workspace
 
-# help: ## Zeigt diese Hilfe an
-# 	@echo "$(GREEN)Setup und Installation:$(NC)"
-# 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E 'install|setup|check' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
-# 	@echo ""
-# 	@echo "$(GREEN)Entwicklung:$(NC)"
-# 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E 'run|dev|test|lint|format' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
-# 	@echo ""
-# 	@echo "$(GREEN)Docker:$(NC)"
-# 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E 'docker' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
-# 	@echo ""
-# 	@echo "$(GREEN)Wartung:$(NC)"
-# 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -E 'clean|upgrade' | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
-# 	@echo ""
 
 # ============================================================================
 # Setup und Installation
@@ -63,7 +49,7 @@ upgrade-deps: ## Aktualisiert alle Python-Pakete auf die neueste Version
 # ============================================================================
 
 run: ## Startet die Anwendung lokal (Produktionsmodus)
-	$(PYTHON) app.py
+	$(PYTHON) -m src.app
 
 dev: ## Startet die Anwendung im Entwicklungsmodus (mit Auto-Reload)
 	FLASK_ENV=development $(PYTHON) app.py

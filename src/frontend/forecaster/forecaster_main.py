@@ -12,7 +12,7 @@ from __future__ import annotations
 # ==============================================================================
 # IMPORTS
 # ==============================================================================
-
+import base64
 import sys
 import os
 import io
@@ -46,13 +46,21 @@ except Exception:
 import shutil
 
 
+FORECASTER_DIR = Path(__file__).resolve().parent
+
+try:
+    APP_ROOT: Path = FORECASTER_DIR.parent
+except Exception:
+    APP_ROOT = Path.cwd()
+
+
 # ==============================================================================
 # KONFIGURATION & KONSTANTEN
 # ==============================================================================
 
 # Farben/Theming
 try:
-    from app import GVB_COLORS, GVB_COLOR_SEQUENCE, BRAND_COLOR
+    from main.app import GVB_COLORS, GVB_COLOR_SEQUENCE, BRAND_COLOR
 except Exception:
     GVB_COLORS = {
         'Gesamt GVB': '#14324E',
@@ -64,21 +72,120 @@ except Exception:
     GVB_COLOR_SEQUENCE = ['#17a2b8', '#28a745', '#ffc107', '#dc3545', '#14324E']
     BRAND_COLOR = "#14324E"
 
+
+
+
+
+def format_axis_quarters(fig, date_iterable):
+    """
+    Formatiert die X-Achse als KATEGORISCH (String-basiert), um "Qx YYYY"
+    als Header im Hover zu erzwingen, während die visuelle Sortierung erhalten bleibt.
+    Ticks weiterhin nur alle 5 Jahre (z.B. Q1 2020).
+    """
+    try:
+        if date_iterable is None or len(date_iterable) == 0:
+            return
+
+        dt_index = pd.to_datetime(list(date_iterable))
+        if dt_index.empty:
+            return
+
+        min_date = dt_index.min()
+        max_date = dt_index.max()
+        
+        if pd.isna(min_date) or pd.isna(max_date):
+            return
+
+        # 1. Master-Timeline erstellen (Alle Quartale im Bereich)
+        try:
+            start_q = pd.Timestamp(min_date).to_period('Q').start_time
+            end_q = pd.Timestamp(max_date).to_period('Q').end_time
+        except Exception:
+            return
+            
+        full_qs = pd.date_range(start=start_q, end=end_q, freq='QS')
+        if len(full_qs) == 0:
+            return
+
+        # Mapping: Timestamp -> "Qx YYYY"
+        # UND: Erstellen der geordneten Kategorie-Liste
+        def to_q_str(d):
+            return f"Q{d.quarter} {d.year}"
+            
+        category_order = [to_q_str(d) for d in full_qs]
+        
+        # 2. Alle Traces auf String-Werte mappen
+        for trace in fig.data:
+            if getattr(trace, 'x', None) is None:
+                continue
+            try:
+                # Altdaten (Datetimes) zu Strings konvertieren
+                ts_series = pd.to_datetime(pd.Series(trace.x), errors='coerce')
+                # NaT ignorieren/leeren
+                new_x = ts_series.apply(lambda x: to_q_str(x) if pd.notna(x) else None).tolist()
+                trace.x = new_x
+                
+                # Hovertemplate bereinigen (Header macht jetzt den Job)
+                trace.hovertemplate = "%{fullData.name}: %{y}<extra></extra>"
+            except Exception:
+                pass
+
+        # 3. Ticks berechnen (5 Jahres Abstand)
+        min_year = min_date.year
+        max_year = max_date.year
+        tick_vals = []
+        
+        years = range(min_year, max_year + 1)
+        span = max_year - min_year
+        
+        target_years = []
+        if span >= 5:
+            target_years = [y for y in years if y % 5 == 0]
+        else:
+            target_years = list(years)
+            
+        # Wir setzen den Tick genau auf das String-Label "Q1 YYYY"
+        for y in target_years:
+            val = f"Q1 {y}"
+            if val in category_order:
+                tick_vals.append(val)
+        
+        # 4. Layout Update
+        fig.update_xaxes(
+            type='category',
+            categoryorder='array',
+            categoryarray=category_order,
+            
+            tickmode='array',
+            tickvals=tick_vals,
+            tickangle=0
+        )
+            
+    except Exception:
+        pass
+
+
+
+
+
 INFO_COLOR = GVB_COLORS.get('Einlagen', '#0d6efd')
 
 # Pfade für Presets/Snapshots
-PRESETS_DIR = Path("./forecaster/presets")
+PRESETS_DIR = FORECASTER_DIR / "presets"
 PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+
 SNAPSHOTS_DIR = PRESETS_DIR / "snapshots"
 SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+
 HCPRESET_CACHE_FILE = PRESETS_DIR / "hc_presets_cache.json"
+
 
 # ==============================================================================
 # LOGGING SETUP
 # ==============================================================================
 
 try:
-    from app import logger as APP_LOGGER
+    from main.app import logger as APP_LOGGER
 except Exception:
     APP_LOGGER = None
 
@@ -94,7 +201,7 @@ logger.propagate = False
 
 # Log-Adapter
 try:
-    from app import Log as _AppLog
+    from main.app import Log as _AppLog
     Log = _AppLog
 except Exception:
     class Log:
@@ -149,9 +256,10 @@ def _filter_gvb_json_by_sektor(gvb_json: str, sektor_value: str) -> str:
         if isinstance(df, pd.DataFrame) and not df.empty and "sektor" in df.columns and sektor_value:
             sekt = str(sektor_value).strip().upper()
             df = df[df["sektor"].astype(str).str.upper() == sekt].copy()
+            logger.debug(f"GVB-Daten nach Sektor '{sekt}' gefiltert: {len(df)} Zeilen")
         return df.to_json(orient="split", date_format="iso")
-    except Exception:
-        # Safety fallback: liefere das Original zurück, damit der Forecast nicht bricht
+    except Exception as e:
+        logger.warning(f"Sektorfilterung fehlgeschlagen: {e}, verwende ungefilterte Daten")
         return gvb_json
 
 
@@ -175,6 +283,7 @@ def _parse_store_df(payload) -> pd.DataFrame:
         try:
             obj = json.loads(payload)
         except Exception:
+            logger.debug("Store-Payload konnte nicht als JSON geparst werden")
             return pd.DataFrame()
     else:
         obj = payload
@@ -202,6 +311,7 @@ def _parse_store_df(payload) -> pd.DataFrame:
         except Exception:
             pass
 
+    logger.debug("Store-Payload konnte nicht in DataFrame konvertiert werden")
     return pd.DataFrame()
 
 
@@ -430,23 +540,37 @@ def _build_main_e1_table_from_store(
 # ==============================================================================
 
 def _find_ecb_db() -> Optional[Path]:
-    """Findet ecb_database.xlsx."""
+    """Findet ecb_database.xlsx im Projektumfeld auf Basis von APP_ROOT."""
+    base_dir = APP_ROOT
+    forecaster_dir = FORECASTER_DIR
+
+    # 1) Bevorzugte, feste Pfade relativ zum Code
     candidates = [
-        Path(__file__).parent / "ecbdata" / "ecb_database.xlsx",
-        Path.cwd() / "ecbdata" / "ecb_database.xlsx",
-        Path.cwd() / "ecb_database.xlsx"
+        forecaster_dir / "ecbdata" / "ecb_database.xlsx",  # forecaster/ecbdata/ecb_database.xlsx
+        base_dir / "ecbdata" / "ecb_database.xlsx",        # <APP_ROOT>/ecbdata/ecb_database.xlsx
+        base_dir / "ecb_database.xlsx",                    # <APP_ROOT>/ecb_database.xlsx
     ]
-    
+
     for p in candidates:
         if p.exists():
             return p
-    
+
+    # 2) Suche nach generischen ecb_* Dateien im Projekt
+    search_roots = [forecaster_dir, base_dir]
+    for root in search_roots:
+        for pattern in ["ecbdata/ecb_*.xlsx", "ecb_*.xlsx"]:
+            matches = list(root.glob(pattern))
+            if matches:
+                return matches[0]
+
+    # 3) Letzter Fallback: aktuelles Arbeitsverzeichnis (nur zur Sicherheit)
     for pattern in ["ecbdata/ecb_*.xlsx", "ecb_*.xlsx"]:
         matches = list(Path.cwd().glob(pattern))
         if matches:
             return matches[0]
-    
+
     return None
+
 
 
 def _load_ecb_options() -> List[Dict]:
@@ -822,8 +946,8 @@ def _download_exog_codes(ecb_codes: list) -> pd.DataFrame:
         from datetime import datetime, timezone
 
         # App-Root: .../forecaster/ → ein Ordner hoch
-        app_root = Path(__file__).resolve().parent.parent
-        loader_dir = app_root / "loader"
+        loader_dir = APP_ROOT / "loader"
+
 
         # globaler Cache (dürfen wir weiter nutzen)
         cache_dir = loader_dir / "financial_cache"
@@ -1283,7 +1407,7 @@ def _add_backtest_markers(
                 hovertemplate='<b>Datum</b>: %{x}<br><b>Tatsächlich</b>: %{y:.2f}<br><b>Fehler</b>: %{customdata:.2f}<extra></extra>',
                 customdata=large_errors['error']
             ))
-            logger.info(f"[Backtest-Markers] ✓ {len(large_errors)} große Fehler markiert")
+            logger.debug(f"[Backtest-Markers] {len(large_errors)} große Fehler markiert")
     except Exception as e:
         logger.warning(f"[Backtest-Markers] Konnte Marker nicht hinzufügen: {e}")
     
@@ -1846,6 +1970,15 @@ def _create_pipeline_chart(
     except Exception as e:
         logger.warning(f"[Chart] Konnte Y-Achse/Cutoff nicht finalisieren: {e}")
 
+    try:
+        # X-Achsen-Formatierung (Quartale)
+        if x_range:
+             format_axis_quarters(fig, x_range)
+        elif not hist.empty:
+             format_axis_quarters(fig, hist['date'])
+    except Exception:
+        pass
+
     fig.update_traces(line_shape='linear', selector=dict(type='scatter'))
     return fig
 
@@ -2096,7 +2229,7 @@ def update_horizon_display(quarters):
 # "Neu"-Button -> Cache (runs) leeren
 # ==============================================================================
 
-_BASE_DIR = Path(__file__).resolve().parent.parent  # ein Ordner hoch von /forecaster
+_BASE_DIR = APP_ROOT  # ein Ordner hoch von /forecaster
 RUNS_DIR = Path(os.getenv("FORECASTER_RUNS_DIR", _BASE_DIR / "loader" / "runs")).resolve()
 
 
@@ -2408,7 +2541,7 @@ def handle_runs_modal(open_click, close_click, load_clicks, is_open):
             "path": str(run_dir),
             "meta": meta,
         }
-        logger.info(f"[Runs-List] Run gewählt: {picked}")
+        logger.info(f"[Runs-List] Run gewählt: {picked.get('cache_tag')}")
 
         # Modal schließen, Body nicht anrühren, Store füllen
         return False, no_update, picked
@@ -2435,7 +2568,7 @@ def populate_preset_dropdown_options(
     target_value: Optional[str]
 ):
     try:
-        from app import (
+        from main.app import (
             _load_user_presets_from_disk,
             merge_hc_and_user_presets_for_dropdown,
             _normalize_target_slug as _app_norm_slug,
@@ -2456,12 +2589,12 @@ def populate_preset_dropdown_options(
                 meta = all_hc_presets[target_slug]
                 title = meta.get("title") or f"H&C {target_slug}"
                 hc_dict[title] = {"id": target_slug}
-                logger.info(f"[PresetDropdown] H&C-Preset geladen: {title}")
+                logger.debug(f"[PresetDropdown] H&C-Preset geladen: {title}")
         except Exception as e:
             logger.warning(f"[PresetDropdown] H&C-Presets nicht verfügbar: {e}")
         
         user_dict_disk = _load_user_presets_from_disk()
-        logger.info(f"[PresetDropdown] User-Presets von Disk: {len(user_dict_disk)} Stück")
+        logger.debug(f"[PresetDropdown] {len(user_dict_disk)} User-Presets von Disk geladen")
         
         options = merge_hc_and_user_presets_for_dropdown(
             hc_presets=hc_dict,
@@ -2472,7 +2605,7 @@ def populate_preset_dropdown_options(
         
         options.insert(0, {"label": "– kein Preset –", "value": "__none__"})
         
-        logger.info(f"[PresetDropdown] Optionen generiert: {len(options)} Einträge")
+        logger.debug(f"[PresetDropdown] {len(options)} Optionen generiert")
         return options, user_dict_disk
     
     except Exception as e:
@@ -2499,9 +2632,9 @@ def apply_preset_to_model_store(selected_value: Optional[str]):
         raise PreventUpdate
     
     try:
-        from app import _load_user_presets_from_disk
+        from main.app import _load_user_presets_from_disk
         if not str(selected_value).startswith("user_"):
-            logger.info("[ApplyPreset] Kein User-Preset → Model-Store unverändert")
+            logger.debug("[ApplyPreset] Kein User-Preset")
             raise PreventUpdate
         
         user_id = selected_value[5:]
@@ -2518,10 +2651,7 @@ def apply_preset_to_model_store(selected_value: Optional[str]):
                 if model_path or snapshot_path:
                     model_exists = model_path and os.path.exists(model_path)
                     snapshot_exists = snapshot_path and os.path.exists(snapshot_path)
-                    logger.info(
-                        f"[ApplyPreset] Preset '{display_name}' geladen | "
-                        f"Model: {model_exists} | Snapshot: {snapshot_exists}"
-                    )
+                    logger.info(f"[ApplyPreset] Preset '{display_name}' geladen")
                     return {
                         "path": model_path if model_exists else None,
                         "exog_snapshot_path": snapshot_path if snapshot_exists else None
@@ -2609,9 +2739,9 @@ def save_preset_with_name(n_clicks, preset_name, target_value, exog_values,
         raise PreventUpdate
     
     try:
-        from app import create_user_preset_from_ui_state, upsert_user_preset
+        from main.app import create_user_preset_from_ui_state, upsert_user_preset
         
-        logger.info("[SavePresetModal] Speichervorgang gestartet...")
+        logger.debug("[SavePresetModal] Speichervorgang gestartet")
         
         if not preset_name or not preset_name.strip():
             target = str(target_value or "Preset").strip()
@@ -2619,10 +2749,10 @@ def save_preset_with_name(n_clicks, preset_name, target_value, exog_values,
             horizon = int(horizon_quarters or 0)
             ts = time.strftime("%Y-%m-%d %H:%M")
             preset_name = f"{target} | {len(exogs)} Exog | {horizon}Q @ {ts}"
-            logger.info(f"[SavePresetModal] Kein Name → Auto-Name: {preset_name}")
+            logger.debug(f"[SavePresetModal] Auto-Name generiert: {preset_name}")
         else:
             preset_name = preset_name.strip()
-            logger.info(f"[SavePresetModal] User-Name: {preset_name}")
+            logger.debug(f"[SavePresetModal] User-Name: {preset_name}")
         
         target = str(target_value or "Preset").strip()
         exogs = list(exog_values or [])
@@ -2741,7 +2871,7 @@ def delete_selected_preset(n_clicks, dropdown_value, user_presets):
         updated.pop(key_to_remove, None)
 
     try:
-        from app import delete_user_preset
+        from main.app import delete_user_preset
         updated = delete_user_preset(preset_identifier=pid, delete_files=False) or updated
     except Exception:
         pass
@@ -2875,6 +3005,7 @@ def _compute_simple_metrics(metadata: dict) -> dict:
         "mae": None,
         "rmse": None,
         "r2": None,
+        "wape": None,
         "bias_pct": None,
         "smape": None,
         "directional": None,
@@ -2960,6 +3091,11 @@ def _compute_simple_metrics(metadata: dict) -> dict:
         cv_res_arr = np.array(cv_res, dtype=float)
         mean_resid = float(np.mean(cv_res_arr))
         bias_pct = (mean_resid / float(y_mean)) * 100.0
+
+    # WAPE berechnen (Weighted MAPE = MAE / Mean) -> robuster als MAPE/sMAPE bei Nullen
+    wape = None
+    if mae is not None and y_mean is not None and abs(y_mean) > 1e-9:
+        wape = (float(mae) / abs(float(y_mean))) * 100.0
 
     # CI-Deckung nur berechnen, wenn wir noch keine haben
     if not coverage_dict and isinstance(cv_res, list) and len(cv_res) > 0 and std_error not in (None, 0):
@@ -3057,6 +3193,7 @@ def _compute_simple_metrics(metadata: dict) -> dict:
     result.update({
         "mae": mae,
         "rmse": rmse,
+        "wape": wape,
         "r2": r2,
         "bias_pct": bias_pct,
         "smape": smape,
@@ -3098,6 +3235,10 @@ def export_forecast_rawdata(
 
     import os
     from pathlib import Path
+
+
+
+
 
     def _flatten_metadata_to_df(meta: dict) -> pd.DataFrame:
         rows = []
@@ -3244,7 +3385,7 @@ def export_forecast_rawdata(
 
         if model_path:
             try:
-                from forecaster_pipeline import ModelArtifact  # type: ignore
+                from src.forecaster.forecaster_pipeline import ModelArtifact  # type: ignore
                 art = ModelArtifact.load(model_path)
                 cfg_dict = art.config_dict or {}
                 if cfg_dict:
@@ -3334,6 +3475,78 @@ def export_forecast_rawdata(
 
     filename = f"forecast_export_{sektor_value or 'NA'}_{modus}_{pd.Timestamp.today().strftime('%Y-%m-%d')}.xlsx"
     return dcc.send_bytes(lambda b: b.write(xbytes), filename)
+
+
+@app.callback(
+    Output("custom-final-dataset-store", "data"),
+    Output("upload-custom-dataset-feedback", "children"),
+    Input("upload-custom-dataset", "contents"),
+    State("upload-custom-dataset", "filename"),
+    State("upload-custom-dataset", "last_modified"),
+    prevent_initial_call=True,
+)
+def handle_custom_dataset_upload(contents, filename, last_modified):
+    if contents is None:
+        raise PreventUpdate
+
+    try:
+        # 1) Base64 → Bytes
+        content_type, content_string = contents.split(",", 1)
+        decoded = base64.b64decode(content_string)
+        bio = io.BytesIO(decoded)
+
+        # 2) Excel lesen – bevorzugt PIPELINE_PREP, sonst final_dataset, sonst erstes Sheet
+        xls = pd.ExcelFile(bio)
+        sheet_name = None
+        for cand in ("PIPELINE_PREP", "final_dataset"):
+            if cand in xls.sheet_names:
+                sheet_name = cand
+                break
+        if sheet_name is None:
+            sheet_name = xls.sheet_names[0]
+
+        df = pd.read_excel(xls, sheet_name=sheet_name)
+
+        # 3) Datumsspalte auf "date" normalisieren
+        if "date" not in df.columns:
+            for cand in ("Datum", "DATE", "Date", "ds", "time", "Time"):
+                if cand in df.columns:
+                    df = df.rename(columns={cand: "date"})
+                    break
+
+        if "date" not in df.columns:
+            msg = (
+                "Das hochgeladene Excel enthält weder eine Spalte 'date' noch 'Datum'. "
+                "Bitte das von der Prognose-Suite exportierte File als Grundlage verwenden."
+            )
+            return dash.no_update, dbc.Alert(msg, color="danger", className="mt-2")
+
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+
+        # 4) Payload für den Store bauen
+        payload = {
+            "filename": filename,
+            "uploaded_at": pd.Timestamp.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "sheet_name": sheet_name,
+            "json": df.to_json(orient="split", date_format="iso"),
+        }
+
+        info = (
+            f"Custom-Dataset geladen: '{filename}' "
+            f"(Sheet: {sheet_name}, Zeilen: {len(df)}, Spalten: {len(df.columns)})"
+        )
+        return payload, dbc.Alert(info, color="success", className="mt-2")
+
+    except Exception as e:
+        logger.exception("[Upload] Fehler beim Einlesen des Custom-Datasets: %s", e)
+        msg = "Fehler beim Einlesen des Excel-Files. Bitte Struktur prüfen."
+        return dash.no_update, dbc.Alert(msg, color="danger", className="mt-2")
+
+
+
+
+
 
 
 # ==============================================================================
@@ -3644,14 +3857,24 @@ def show_initial_forecast_history(
         State('show-backtest-switch', 'value'),
         State('model-artifact-store', 'data'),
         State('forecast-sektor-dropdown', 'value'),
+        State('custom-final-dataset-store', 'data'),  # << NEU
     ],
     prevent_initial_call=True
 )
 def create_pipeline_forecast(
-    confirm_clicks, button_clicks,            # 2 Inputs in dieser Reihenfolge
-    exog_json, target, exog_vars, horizon,
-    use_cache, gvb_json, is_fluss_mode, show_backtest,
-    model_payload, sektor_value
+    confirm_clicks,
+    create_clicks,
+    exog_json,
+    target,
+    exog_vars,
+    horizon,
+    use_cache,
+    gvb_json,
+    is_fluss_mode,
+    show_backtest,
+    model_payload,
+    sektor_value,
+    custom_final_dataset,
 ):
     # Callback wurde ausgelöst (entweder Confirm ODER "Prognose erstellen")
     ctx = dash.callback_context
@@ -3707,7 +3930,11 @@ def create_pipeline_forecast(
             gvb_json_filtered = _filter_gvb_json_by_sektor_fallback(gvb_json, sektor_value)
 
         # 3) Adapter aufsetzen & Forecast rechnen
-        adapter = DashboardForecastAdapter(gvb_json_filtered, exog_json)
+        adapter = DashboardForecastAdapter(
+            gvb_json_filtered,
+            exog_json,
+            custom_final_dataset=custom_final_dataset,
+        )
         adapter.pipeline_info.update({
             "ui_target": target,
             "use_flows": bool(is_fluss_mode),
@@ -3749,7 +3976,7 @@ def create_pipeline_forecast(
 
         # 5) Metriken
         simple = _compute_simple_metrics(metadata if isinstance(metadata, dict) else {})
-        logger.info(f"[Forecast] Simple metrics (resolved): {simple}")
+        logger.debug(f"Metriken berechnet: MAE={simple.get('mae', 0):.2f}, R²={simple.get('r2', 0):.3f}")
 
         def _fmt_num(x, nd=2, dash='—'):
             try:
@@ -3766,6 +3993,7 @@ def create_pipeline_forecast(
         mae_txt   = _fmt_num(simple.get("mae"), nd=2)
         rmse_txt  = _fmt_num(simple.get("rmse"), nd=2)
         r2_txt    = _fmt_num(simple.get("r2"), nd=3)
+        wape_txt  = _fmt_pct(simple.get("wape"), nd=1)
         bias_txt  = _fmt_pct(simple.get("bias_pct"), nd=1)
         smape_txt = _fmt_pct(simple.get("smape"), nd=1)
         dir_txt   = _fmt_pct(simple.get("directional"), nd=0)
@@ -3774,41 +4002,55 @@ def create_pipeline_forecast(
         cov80 = _fmt_pct(coverage.get(80), nd=1)
         cov95 = _fmt_pct(coverage.get(95), nd=1)
 
+        # Neue UI Struktur (Anti-Confusion)
         if dbc is not None:
+            # Hilfsfunktion für Label mit Tooltip-Icon
+            def _lbl(text, tooltip_id, tooltip_text):
+                return html.Div([
+                    html.Span(text, id=tooltip_id, style={"cursor": "help", "borderBottom": "1px dotted #999"}),
+                    dbc.Tooltip(tooltip_text, target=tooltip_id, placement="right"),
+                ], className="text-muted small")
+
             metrics = dbc.Container([
                 dbc.Row(
                     dbc.Col(html.Div([
-                        html.Span("Mittlerer Schätzfehler (MAE)", className="text-muted small"),
-                        html.H4(mae_txt, className="mb-0 mt-1"),
-                        html.Div(f"Bias (Über-/Unterschätzung): {bias_txt}", className="small text-secondary mt-1"),
+                        _lbl("Relative Abweichung (WAPE)", "tt-wape", 
+                             "Durchschnittliche prozentuale Abweichung relativ zum Gesamtvolumen. "
+                             "Robust gegen Ausreißer und Nullen."),
+                        html.H4(wape_txt, className="mb-0 mt-1 fw-bold text-primary"),
+                        html.Div(f"Mittlerer Fehler (absolut): {mae_txt}", className="small text-secondary mt-1"),
                     ])),
                     className="mb-3 pb-3",
                     style={"borderBottom": "1px solid #e9ecef"},
                 ),
                 dbc.Row(
                     dbc.Col(html.Div([
-                        html.Span("Prognosegüte", className="text-muted small"),
-                        html.H4(smape_txt, className="mb-0 mt-1"),
-                        html.Div(f"Trefferquote Richtung: {dir_txt}", className="small text-secondary mt-1"),
-                    ])),
-                    className="mb-3 pb-3",
-                    style={"borderBottom": "1px solid #e9ecef"},
-                ),
-                dbc.Row(
-                    dbc.Col(html.Div([
-                        html.Span("Modellgüte", className="text-muted small"),
-                        html.H4(r2_txt, className="mb-0 mt-1"),
-                        html.Div(f"Typisches Fehlerband (RMSE): {rmse_txt}", className="small text-secondary mt-1"),
-                        html.Div(f"CI-Deckung 80/95: {cov80} / {cov95}", className="small text-secondary mt-1"),
+                        _lbl("Zuverlässigkeit (95% Intervall)", "tt-cov", 
+                             "Anteil der echten Datenpunkte, die im berechneten 95%-Sicherheitsbereich lagen. "
+                             "Ideal sind 95%."),
+                        html.H4(cov95, className="mb-0 mt-1 fw-bold text-dark"),
+                        html.Div([
+                            html.Span("Tendenz (Bias): ", id="tt-bias", style={"cursor": "help"}),
+                            html.Span(bias_txt, className=("text-success" if (simple.get("bias_pct") or 0) < 5 else "text-danger")),
+                            dbc.Tooltip("Gibt an, ob das Modell systematisch zu hoch (+) oder zu niedrig (-) schätzt.", target="tt-bias"),
+                        ], className="small text-secondary mt-1"),
                     ])),
                     className="mb-3 pb-1",
                 ),
+                # Details (eingeklappt oder klein)
+                dbc.Row(
+                    dbc.Col(html.Div([
+                        html.Div(f"Modellgüte (R²): {r2_txt}", className="text-muted small", title="Erklärte Varianz"),
+                        html.Div(f"Typischer Fehler (RMSE): {rmse_txt}", className="text-muted small", title="Wurzeltausch mittlerer quadratischer Fehler"),
+                    ])),
+                    className="mt-2 pt-2 border-top",
+                )
             ])
         else:
             metrics = html.Div([
-                html.Div([html.B("Mittlerer Schätzfehler (MAE): "), html.Span(mae_txt), html.Small(f"  | Bias: {bias_txt}")]),
-                html.Div([html.B("Prognosegüte (sMAPE): "), html.Span(smape_txt), html.Small(f"  | Richtungstreffer: {dir_txt}")]),
-                html.Div([html.B("Modellgüte (R², CV): "), html.Span(r2_txt), html.Small(f"  | Fehlerband (RMSE): {rmse_txt}  | CI-Deckung 80/95: {cov80}/{cov95}")]),
+                html.Div([html.B("WAPE (Rel. Fehler): "), html.Span(wape_txt), html.Small(f"  | Absolut (MAE): {mae_txt}")]),
+                html.Div([html.B("Zuverlässigkeit (95% CI): "), html.Span(cov95)]),
+                html.Div([html.B("Bias: "), html.Span(bias_txt)]),
             ], className="p-2")
 
         # 6) Feature-Importance
@@ -3816,7 +4058,69 @@ def create_pipeline_forecast(
         features = (metadata or {}).get('model_complexity', {}).get('top_features', {}) if isinstance(metadata, dict) else {}
         icicle_fig = create_feature_importance_icicle(features, top_n=15)
 
-        # 7) Payload für Export / Stores
+        # 7) Geo-Forecast für Geo-Analyse pro Run persistieren
+        try:
+            pipeline_info = getattr(adapter, "pipeline_info", {}) or {}
+            run_loader_dir = pipeline_info.get("run_loader_dir")
+            run_cache_tag = pipeline_info.get("run_cache_tag")
+
+            if run_loader_dir and isinstance(forecast_df, pd.DataFrame) and not forecast_df.empty:
+                run_dir = Path(str(run_loader_dir))
+                try:
+                    run_dir.mkdir(parents=True, exist_ok=True)
+                except Exception:
+                    # Ordner existiert typischerweise bereits aus Step 1 – Fehler hier ignorieren
+                    pass
+
+                geo_excel_path = run_dir / "geo_forecast.xlsx"
+                try:
+                    # identische Struktur wie im Export: FORECAST_TS enthält forecast_df
+                    forecast_df.to_excel(geo_excel_path, index=False, sheet_name="FORECAST_TS")
+                    logger.info(f"[Forecast|Geo] Geo-Forecast in {geo_excel_path} geschrieben.")
+                except Exception as e_geo_write:
+                    logger.warning(f"[Forecast|Geo] Konnte Geo-Forecast-Excel nicht schreiben: {e_geo_write}")
+                else:
+                    # run_meta.json im gleichen Run-Ordner anreichern
+                    try:
+                        meta_files = sorted(run_dir.glob("*_run_meta.json"))
+                        if meta_files:
+                            meta_path = meta_files[0]
+                            try:
+                                with meta_path.open("r", encoding="utf-8") as fh:
+                                    run_meta = json.load(fh) or {}
+                            except Exception:
+                                run_meta = {}
+                        else:
+                            # Fallback: neue Meta-Datei anlegen, falls aus irgendeinem Grund keine existiert
+                            meta_path = run_dir / "run_meta.json"
+                            run_meta = {}
+
+                        run_meta["geo_forecast_path"] = str(geo_excel_path)
+                        # kleine Zusatzinfos für UI / Debug
+                        run_meta.setdefault("geo_forecast_info", {})
+                        run_meta["geo_forecast_info"].update(
+                            {
+                                "cache_tag": run_cache_tag,
+                                "created_at": datetime.utcnow().isoformat(),
+                            }
+                        )
+
+                        with meta_path.open("w", encoding="utf-8") as fh:
+                            json.dump(run_meta, fh, ensure_ascii=False, indent=2)
+
+                        logger.info(f"[Forecast|Geo] run_meta mit Geo-Forecast aktualisiert: {meta_path}")
+                    except Exception as e_meta:
+                        logger.warning(f"[Forecast|Geo] Konnte run_meta.json für Geo-Forecast nicht aktualisieren: {e_meta}")
+
+                    # Pfad zusätzlich im Metadata ablegen (optional für andere Callbacks)
+                    if isinstance(metadata, dict):
+                        geo_meta = metadata.setdefault("geo_export", {})
+                        geo_meta["run_loader_dir"] = str(run_dir)
+                        geo_meta["geo_forecast_path"] = str(geo_excel_path)
+        except Exception as e_geo:
+            logger.warning(f"[Forecast|Geo] Fehler beim Persistieren des Geo-Forecasts: {e_geo}")
+
+        # 8) Payload für Export / Stores
         model_path = (metadata or {}).get("model_path") if isinstance(metadata, dict) else None
         snapshot_path = (metadata or {}).get("exog_snapshot_path") if isinstance(metadata, dict) else None
         dash_export_bundle = (metadata or {}).get("dash_export", {}) if isinstance(metadata, dict) else {}
@@ -3855,7 +4159,6 @@ def create_pipeline_forecast(
         )
 
 
-
 # ==============================================================================
 # BACKTEST-TOGGLE (Chart neu zeichnen, aber robust)
 # ==============================================================================
@@ -3881,7 +4184,7 @@ def toggle_backtest_visualization(
     exog_json, exog_vars, sektor_value
 ):
     if not fc_state or not fc_state.get('has_forecast'):
-        logger.info("[Backtest-Toggle] Kein Forecast vorhanden, überspringe")
+        logger.debug("[Backtest-Toggle] Kein Forecast vorhanden")
         return dash.no_update
 
     if not gvb_json:
@@ -3900,7 +4203,7 @@ def toggle_backtest_visualization(
 
     try:
         backtest_mode = "overlay"
-        logger.info(f"[Backtest-Toggle] show={show_backtest}, mode={backtest_mode}, sektor={sektor_value}")
+        logger.debug(f"[Backtest-Toggle] show={show_backtest}, sektor={sektor_value}")
 
         if not HAS_PIPELINE or DashboardForecastAdapter is None:
             logger.error("[Backtest-Toggle] Pipeline nicht verfügbar")
@@ -3911,7 +4214,11 @@ def toggle_backtest_visualization(
         except Exception:
             gvb_json_filtered = _filter_gvb_json_by_sektor_fallback(gvb_json, sektor_value)
 
-        adapter = DashboardForecastAdapter(gvb_json_filtered, exog_json)
+        adapter = DashboardForecastAdapter(
+            gvb_store_json=gvb_json_filtered,
+            exog_store_json=exog_json,
+            custom_final_dataset=custom_final_dataset,  # << NEU
+        )
         adapter.pipeline_info.update({
             "ui_target": target,
             "use_flows": bool(is_fluss_mode),
@@ -3940,12 +4247,27 @@ def toggle_backtest_visualization(
             backtest_mode=backtest_mode
         )
 
-        logger.info("[Backtest-Toggle] Chart erfolgreich aktualisiert")
+        logger.debug("[Backtest-Toggle] Chart aktualisiert")
         return fig
 
     except Exception as e:
         logger.exception(f"[Backtest-Toggle] Fehler: {e}")
         return dash.no_update
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ==============================================================================

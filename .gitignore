@@ -18,15 +18,15 @@ __pycache__/
 .scenario_month.stamp
 
 # Data and Cache
-loader/financial_cache/
-loader/gvb_output.parquet
-loader/gvb_output.xlsx
-loader/runs/
+src/backend/loader/financial_cache/
+src/backend/loader/gvb_output.parquet
+src/backend/loader/gvb_output.xlsx
+src/backend/loader/runs/
 
 # Scenario outputs
-scenario/data/analysis_data.xlsx
-scenario/data/output.xlsx
+src/frontend/scenario/data/analysis_data.xlsx
+src/frontend/scenario/data/output.xlsx
 
 # Forecaster outputs
-forecaster/trained_models/
-forecaster/trained_outputs/
+src/backend/forecaster/trained_models/
+src/backend/forecaster/trained_outputs/

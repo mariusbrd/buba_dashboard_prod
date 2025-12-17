@@ -51,7 +51,7 @@ try:
     from foundation import year_tickvals_biennial, window_from_slider, map_sektor
     from foundation.colors import get_category_color, get_hierarchical_color, GVB_COLOR_SEQUENCE
     from data_manager import DataManager, StoreSource, DiskSource
-    from app import format_axis_quarters # <-- NEU
+    from main.app import format_axis_quarters # <-- NEU
 except Exception:
     # In manchen Setups kommen diese aus 'app' oder anderen Paketen; notfalls später via try/except in den Funktionen
     pass

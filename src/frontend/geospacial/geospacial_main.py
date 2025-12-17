@@ -30,7 +30,7 @@ from .geospacial_viz import (
     build_empty_map,
 )
 
-from forecaster.forecaster_main import (  # NEU
+from src.frontend.forecaster.forecaster_main import (  # NEU
     _discover_runs,
     _load_run_meta,
     RUNS_DIR,

@@ -86,6 +86,7 @@ class Log:
     SCENARIO_TABLE_NS = "ScenarioTable"
 
     @staticmethod
+
     def scenario_table(msg: str, also_root: bool = True):
         import logging as _pylogging
         _pylogging.getLogger(Log.SCENARIO_TABLE_NS).info(f"[ScenarioTable] {msg}")
@@ -1854,17 +1855,17 @@ DashboardForecastAdapter = None
 
 try:
     # Falls 'forecaster' ein richtiges Package ist (mit __init__.py)
-    from forecaster.forecast_integration import DashboardForecastAdapter as _Adapter
+    from src.backend.forecaster.forecast_integration import DashboardForecastAdapter as _Adapter
     DashboardForecastAdapter = _Adapter
     HAS_PIPELINE = True
-    logger.info("✓ Pipeline-Integration geladen (forecaster.forecast_integration)")
+    logger.info("✓ Pipeline-Integration geladen (src.backend.forecaster.forecast_integration)")
 except Exception as e_pkg:
     try:
         # Fallback: Modul direkt unter forecaster/ via sys.path
-        from forecast_integration import DashboardForecastAdapter as _Adapter
+        from src.backend.forecaster.forecast_integration import DashboardForecastAdapter as _Adapter 
         DashboardForecastAdapter = _Adapter
         HAS_PIPELINE = True
-        logger.info("✓ Pipeline-Integration geladen (forecast_integration)")
+        logger.info("✓ Pipeline-Integration geladen (src.backend.forecaster.forecast_integration)")
     except Exception as e_mod:
         logger.warning(f"⚠️ Pipeline nicht verfügbar: {e_mod}")
 # Loader integration
@@ -1873,7 +1874,7 @@ if str(loader_path) not in sys.path:
     sys.path.insert(0, str(loader_path))
 
 try:
-    from exog_instructor import download_ecb_indicators
+    from src.backend.loader.exog_instructor import download_ecb_indicators
     HAS_INSTRUCTOR = True
     logger.info("✓ exog_instructor erfolgreich importiert")
 except ImportError as e:
@@ -1885,7 +1886,7 @@ if str(scenario_path) not in sys.path:
     sys.path.insert(0, str(scenario_path))
 
 try:
-    from scenario_dataloader import DashDownloadConfig, DashDataDownloader  # nutzt deinen Adapter
+    from src.frontend.scenario.scenario_dataloader import DashDownloadConfig, DashDataDownloader  # nutzt deinen Adapter
     HAS_SCENARIO_DOWNLOADER = True
     logger.info("✓ Scenario-Downloader geladen")
 except ImportError as e:
@@ -3618,7 +3619,7 @@ server = app.server
 # --------------------------------------------------------------------------
 # Modul-Callbacks registrieren
 # --------------------------------------------------------------------------
-from overview import overview_main
+from src.frontend.overview import overview_main
 overview_main.register_overview_callbacks(
     app,
     Log=Log,
@@ -3627,13 +3628,13 @@ overview_main.register_overview_callbacks(
     DiskSource=DiskSource,
 )
 
-from forecaster import forecaster_main
+from src.frontend.forecaster import forecaster_main
 forecaster_main.register_forecaster_callbacks(app, Log)
 
-from scenario import scenario_main
+from src.frontend.scenario import scenario_main
 scenario_main.register_scenario_callbacks(app, Log)
 
-from geospacial.geospacial_main import (
+from src.frontend.geospacial.geospacial_main import (
     create_geo_layout,
     register_geo_callbacks,
     app_preload_vgrdl,          # kannst du später auch entfernen, wenn ungenutzt
@@ -4031,7 +4032,7 @@ def run_startup_preloads():
 
     # Szenario Komponenten nur laden, wenn vorhanden
     try:
-        from scenario_dataloader import (
+        from src.frontend.scenario.scenario_dataloader import (
             DashDownloadConfig,
             DashDataDownloader,
             should_run_this_month,
