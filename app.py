@@ -1186,7 +1186,51 @@ MIT automatischer Spalten-Korrektur für vertauschte bestand/fluss.
 
         # 1) Datei prüfen
         if not path.exists():
-            return pd.DataFrame()
+            # Fallback: Wenn gvb_output.xlsx fehlt (z.B. weil in .gitignore und frisch ausgecheckt),
+            # versuchen wir sie zu generieren.
+            if path.name == "gvb_output.xlsx":
+                logger.warning(f"LoadExcel | {path} fehlt – versuche instructor.py …")
+                try:
+                    # Versuche, die globale Funktion aufzurufen (falls definiert)
+                    # run_instructor_loader() liegt weiter unten im Skript
+                    rebuilt = run_instructor_loader()  # type: ignore
+                    if rebuilt and rebuilt.exists():
+                        logger.info(f"LoadExcel | benutze neu erzeugte Datei: {rebuilt}")
+                        # Wir arbeiten mit dem neuen Pfad weiter (könnte Parquet sein, aber hier erwarten wir Excel-Logik)
+                        # Da _load_excel spezifisch für Excel ist, hoffen wir, dass run_instructor_loader eine XLSX liefert oder wir sie lesen können.
+                        # run_instructor_loader returns Path.
+                        # Wenn es Parquet zurückgibt, wird pd.ExcelFile unten crashen.
+                        # ABER: Die Methode _read_any ruft _load_excel nur für .xlsx auf.
+                        # Wenn wir hier neu bauen, und run_instructor_loader gibt Parquet zurück, haben wir ein Problem,
+                        # weil wir hier in _load_excel sind.
+                        
+                        # Fix: Wenn rebuilt KEIN Excel ist, müssen wir aufgeben oder rekursiv _read_any aufrufen (geht nicht wegen self).
+                        # Wir prüfen die Extension.
+                        if rebuilt.suffix.lower() == ".xlsx":
+                            path = rebuilt
+                        else:
+                            # Falls Parquet zurückkommt, können wir es hier nicht verarbeiten (wir sind in _load_excel).
+                            # Aber wir können es in die Logik von oben durchreichen? Nein.
+                            # Wir loggen Warning und returnen empty, ABER beim nächsten Start wird _read_any Parquet nehmen.
+                            # Oder wir geben hier auf.
+                             logger.warning(f"LoadExcel | Neu erzeugte Datei ist {rebuilt.suffix} ({rebuilt}), aber Excel erwartet.")
+                             # Wir versuchen es trotzdem, vllt hat instructor AUCH xlsx erzeugt (macht es meistens).
+                             # Wir checken, ob die ursprünglich angefragte Datei jetzt existiert?
+                             if path.exists():
+                                 pass # Alles gut, path existiert jetzt
+                             else:
+                                 # Wir haben rebuilt (zB parquet) aber path (xlsx) fehlt immer noch.
+                                 return pd.DataFrame()
+                    else:
+                        return pd.DataFrame()
+                except NameError:
+                    logger.error("LoadExcel | run_instructor_loader() nicht verfügbar.")
+                    return pd.DataFrame()
+                except Exception as e:
+                    logger.error(f"LoadExcel | Generierung fehlgeschlagen: {e}")
+                    return pd.DataFrame()
+            else:
+                return pd.DataFrame()
 
         use_path = path
 
