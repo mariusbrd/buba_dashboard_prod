@@ -17,7 +17,6 @@ WORKDIR /app
 COPY --from=fetcher /src/ /app/
 RUN python -m pip install --upgrade pip && \
     if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi && \
-    pip install --no-cache-dir gunicorn && \
-    chmod +x /app/start.sh
+    pip install --no-cache-dir gunicorn
 EXPOSE 8080
-CMD ["/app/start.sh"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "app:server"]

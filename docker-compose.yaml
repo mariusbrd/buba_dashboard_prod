@@ -17,7 +17,9 @@ services:
     volumes:
       - ./forecaster/user_presets:/app/forecaster/user_presets
       - ./forecaster/trained_models:/app/forecaster/trained_models
-      - ./scenario:/app/scenario
+      # ENTFERNT: - ./scenario:/app/scenario
+      # Grund: Volume überschreibt generierte Dateien (output.xlsx, analysis_data.xlsx)
+      # bei jedem Container-Start mit leerem lokalen Verzeichnis
     restart: unless-stopped
 
 secrets:

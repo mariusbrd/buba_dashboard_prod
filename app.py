@@ -4082,8 +4082,11 @@ def run_startup_preloads():
             mark_ran_this_month,
         )
         has_scenario_downloader_local = True
+        lg.info("✅ scenario_dataloader erfolgreich importiert")
     except Exception as e:
         logger.warning(f"⚠️ scenario_dataloader konnte nicht geladen werden: {e}")
+        import traceback
+        logger.warning(f"Traceback: {traceback.format_exc()}")
         has_scenario_downloader_local = False
 
     lg = logging.getLogger("GVB_Dashboard")
@@ -4154,6 +4157,9 @@ def run_startup_preloads():
             force_refresh = os.getenv("SCENARIO_FORCE_REFRESH", "0") == "1"
             
             # Prüfe ob output.xlsx existiert - wenn nicht, erzwinge Download
+            # WICHTIG: config.yaml hat output_path: "data/output.xlsx" (relativ)
+            # → wird zu scenario_path / "data" / "output.xlsx"
+            # Dies matched auch DEFAULT_OUTPUT_XLSX in scenario_dataloader.py
             output_check_path = scenario_path / "data" / "output.xlsx"
             if not output_check_path.exists():
                 lg.warning(f"⚠️ {output_check_path} fehlt – erzwinge Szenario-Download")
@@ -4204,18 +4210,49 @@ def run_startup_preloads():
             lg.warning(f"⚠️ Konnte scenario Analyse Daten nicht initialisieren: {e}")
 
 # ==============================================================================
-# OPTIONALER IMPORT-PRELOAD (für Gunicorn & Co.)
+# OPTIONALER IMPORT-PRELOAD (für Gunicorn & Co.) mit File-Lock
 # ==============================================================================
-# Wenn z.B. im Docker-Container GVB_PRELOAD_ON_IMPORT=1 gesetzt ist und
-# ein WSGI-Server wie gunicorn mit "app:server" startet, wird der Preload
-# einmalig beim Import ausgeführt, ohne app.run() aufzurufen.
-if os.getenv("GVB_PRELOAD_ON_IMPORT", "0") == "1":
+# Wenn z.B. im Docker-Container mit gunicorn gestartet wird, führt der erste
+# Worker die Preloads aus, während andere warten. Dies verhindert Race Conditions
+# bei der Datei-Generierung.
+
+import fcntl
+import time
+
+def _run_preload_with_lock():
+    """Führt Preload mit File-Lock aus - nur ein Worker generiert Dateien."""
+    lock_file = Path("/app/.gvb_preload.lock")  # Im App-Verzeichnis (nicht /tmp)
+    lg = logging.getLogger("GVB_Dashboard")
+    
+    try:
+        # Lock-Datei öffnen/erstellen
+        with open(lock_file, 'w') as f:
+            try:
+                # Versuche exklusiven Lock zu bekommen (non-blocking)
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                
+                # Wir haben den Lock - führe Preload aus
+                lg.info("🔒 Preload-Lock erhalten - führe Initialisierung aus")
+                run_startup_preloads()
+                lg.info("✅ Preload abgeschlossen")
+                
+            except BlockingIOError:
+                # Ein anderer Worker hat den Lock - warte bis er fertig ist
+                lg.info("⏳ Warte auf Preload durch anderen Worker...")
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # Blocking wait
+                lg.info("✅ Preload durch anderen Worker abgeschlossen")
+                
+    except Exception as e:
+        lg.warning(f"⚠️ Preload-Lock Fehler: {e}")
+
+# Automatischer Preload beim Import (z.B. durch gunicorn)
+if os.getenv("GVB_PRELOAD_ON_IMPORT", "1") == "1":
     _lg = logging.getLogger("GVB_Dashboard")
     try:
-        _lg.info("🔁 Import-Hook: führe run_startup_preloads() aus (GVB_PRELOAD_ON_IMPORT=1)")
-        run_startup_preloads()
+        _run_preload_with_lock()
     except Exception as _e:
         _lg.warning(f"⚠️ Preload beim Import fehlgeschlagen: {_e}")
+
 
 # ==============================================================================
 # PRELOADS (if requested)

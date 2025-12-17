@@ -42,8 +42,8 @@ index_aggregate: "sum"
 #index_base_year: 2024
 #index_base_value: 100.0
 
-# Output file
-output_path: "output.xlsx"
+# Output file - WICHTIG: scenario_dataloader.py erwartet Dateien in scenario/data/
+output_path: "data/output.xlsx"
 
 
 
