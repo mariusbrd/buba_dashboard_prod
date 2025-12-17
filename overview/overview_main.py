@@ -1,6 +1,7 @@
 # --- Zusätzliche Standard-Imports ---
 from pathlib import Path
 from datetime import datetime
+import os
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -372,20 +373,45 @@ def initialize_data_stores(pathname, existing_data):
             # Fallback: Versuche gvb_output.xlsx zu generieren
             logger.warning("[Init] gvb_output.xlsx nicht gefunden – versuche Neuerstellung via instructor.py")
             try:
-                # Importiere run_instructor_loader aus app.py (falls verfügbar)
-                from app import run_instructor_loader
-                rebuilt_path = run_instructor_loader()
-                if rebuilt_path and rebuilt_path.exists():
-                    logger.info(f"[Init] ✅ gvb_output.* neu erstellt: {rebuilt_path}")
-                    # Prüfe ob es eine der Kandidaten ist oder verwende es direkt
-                    gvb_path = rebuilt_path
-                else:
-                    raise FileNotFoundError("run_instructor_loader konnte keine Datei erstellen")
-            except ImportError:
-                logger.error("[Init] run_instructor_loader nicht verfügbar (Import-Fehler)")
-                raise FileNotFoundError(
-                    f"gvb_output.xlsx nicht gefunden. Durchsucht: {[str(p) for p in gvb_candidates]}"
+                import subprocess
+                import sys
+                
+                # Direkt instructor.py ausführen (vermeidet circular import von app.py)
+                instructor_path = APP_ROOT / "loader" / "instructor.py"
+                if not instructor_path.exists():
+                    raise FileNotFoundError(f"instructor.py nicht gefunden: {instructor_path}")
+                
+                logger.info(f"[Init] Führe aus: {instructor_path}")
+                result = subprocess.run(
+                    [sys.executable, str(instructor_path)],
+                    cwd=str(instructor_path.parent),
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
                 )
+                
+                if result.returncode != 0:
+                    logger.error(f"[Init] instructor.py fehlgeschlagen (Exit Code: {result.returncode})")
+                    if result.stderr:
+                        logger.error(f"[Init] STDERR: {result.stderr[:500]}")
+                    raise RuntimeError("instructor.py Fehler")
+                
+                logger.info("[Init] instructor.py erfolgreich ausgeführt")
+                
+                # Prüfe ob Datei jetzt existiert (neu suchen)
+                gvb_path = next((p for p in gvb_candidates if p.exists()), None)
+                if gvb_path is None:
+                    # Auch nach loader/gvb_output.parquet schauen
+                    parquet_path = APP_ROOT / "loader" / "gvb_output.parquet"
+                    if parquet_path.exists():
+                        logger.info(f"[Init] ✅ gvb_output.parquet neu erstellt: {parquet_path}")
+                        gvb_path = parquet_path
+                    else:
+                        raise FileNotFoundError("instructor.py lief durch, aber keine Datei erstellt")
+                else:
+                    logger.info(f"[Init] ✅ gvb_output.xlsx neu erstellt: {gvb_path}")
+                    
             except Exception as regen_err:
                 logger.error(f"[Init] Regenerierung fehlgeschlagen: {regen_err}")
                 raise FileNotFoundError(
