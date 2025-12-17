@@ -2277,6 +2277,70 @@ def ensure_monthly_gvb_refresh() -> Path | None:
 
 
 
+# ==============================================================================
+# 13) Chart Helpers (Axes)
+# ==============================================================================
+def format_axis_quarters(fig, date_iterable):
+    """
+    Formatiert die X-Achse eines Plotly-Figures auf 'Qx YYYY'.
+    - date_iterable: Liste/Series von Datums-Objekten (oder Strings).
+    - Verwendet tickmode='array' für volle Kontrolle.
+    - Setzt Ticks auf Quartalsanfänge.
+    """
+    try:
+        if date_iterable is None or len(date_iterable) == 0:
+            return
+
+        # Normalisieren zu Datetime
+        dt_index = pd.to_datetime(list(date_iterable))
+        if dt_index.empty:
+            return
+
+        min_date = dt_index.min()
+        max_date = dt_index.max()
+        
+        # Check against NaT
+        if pd.isna(min_date) or pd.isna(max_date):
+            return
+
+        # Erzeuge Quartals-Range (Quartals-Start)
+        # 'QS' = Quarter Start (01.01., 01.04., 01.07., 01.10.)
+        start_q = pd.Timestamp(min_date).to_period('Q').start_time
+        end_q = pd.Timestamp(max_date).to_period('Q').end_time
+        
+        # Generiere Ticks für jedes Quartal in diesem Bereich
+        qs = pd.date_range(start=start_q, end=end_q, freq='QS')
+
+        if len(qs) == 0:
+            return
+
+        # Labels bauen: "Q1 2024", "Q2 2024" etc.
+        tick_vals = []
+        tick_text = []
+
+        for d in qs:
+            tick_vals.append(d)
+            q_label = f"Q{d.quarter} {d.year}"
+            tick_text.append(q_label)
+
+        # Ausdünnung bei sehr vielen Daten, um Overlap zu vermeiden
+        # (Beispiel: Mehr als 40 Quartale -> 10 Jahre -> jedes 2. Quartal)
+        if len(tick_vals) > 40:
+             tick_vals = tick_vals[::2]
+             tick_text = tick_text[::2]
+        elif len(tick_vals) > 80:
+             tick_vals = tick_vals[::4]
+             tick_text = tick_text[::4]
+
+        fig.update_xaxes(
+            tickmode='array',
+            tickvals=tick_vals,
+            ticktext=tick_text,
+            tickangle=-45,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to format axis quarters: {e}")
+
     
 # ==============================================================================
 # UI-KOMPONENTEN UND LAYOUT

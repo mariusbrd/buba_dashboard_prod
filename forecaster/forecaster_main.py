@@ -72,6 +72,102 @@ except Exception:
     GVB_COLOR_SEQUENCE = ['#17a2b8', '#28a745', '#ffc107', '#dc3545', '#14324E']
     BRAND_COLOR = "#14324E"
 
+
+
+
+
+def format_axis_quarters(fig, date_iterable):
+    """
+    Formatiert die X-Achse als KATEGORISCH (String-basiert), um "Qx YYYY"
+    als Header im Hover zu erzwingen, während die visuelle Sortierung erhalten bleibt.
+    Ticks weiterhin nur alle 5 Jahre (z.B. Q1 2020).
+    """
+    try:
+        if date_iterable is None or len(date_iterable) == 0:
+            return
+
+        dt_index = pd.to_datetime(list(date_iterable))
+        if dt_index.empty:
+            return
+
+        min_date = dt_index.min()
+        max_date = dt_index.max()
+        
+        if pd.isna(min_date) or pd.isna(max_date):
+            return
+
+        # 1. Master-Timeline erstellen (Alle Quartale im Bereich)
+        try:
+            start_q = pd.Timestamp(min_date).to_period('Q').start_time
+            end_q = pd.Timestamp(max_date).to_period('Q').end_time
+        except Exception:
+            return
+            
+        full_qs = pd.date_range(start=start_q, end=end_q, freq='QS')
+        if len(full_qs) == 0:
+            return
+
+        # Mapping: Timestamp -> "Qx YYYY"
+        # UND: Erstellen der geordneten Kategorie-Liste
+        def to_q_str(d):
+            return f"Q{d.quarter} {d.year}"
+            
+        category_order = [to_q_str(d) for d in full_qs]
+        
+        # 2. Alle Traces auf String-Werte mappen
+        for trace in fig.data:
+            if getattr(trace, 'x', None) is None:
+                continue
+            try:
+                # Altdaten (Datetimes) zu Strings konvertieren
+                ts_series = pd.to_datetime(pd.Series(trace.x), errors='coerce')
+                # NaT ignorieren/leeren
+                new_x = ts_series.apply(lambda x: to_q_str(x) if pd.notna(x) else None).tolist()
+                trace.x = new_x
+                
+                # Hovertemplate bereinigen (Header macht jetzt den Job)
+                trace.hovertemplate = "%{fullData.name}: %{y}<extra></extra>"
+            except Exception:
+                pass
+
+        # 3. Ticks berechnen (5 Jahres Abstand)
+        min_year = min_date.year
+        max_year = max_date.year
+        tick_vals = []
+        
+        years = range(min_year, max_year + 1)
+        span = max_year - min_year
+        
+        target_years = []
+        if span >= 5:
+            target_years = [y for y in years if y % 5 == 0]
+        else:
+            target_years = list(years)
+            
+        # Wir setzen den Tick genau auf das String-Label "Q1 YYYY"
+        for y in target_years:
+            val = f"Q1 {y}"
+            if val in category_order:
+                tick_vals.append(val)
+        
+        # 4. Layout Update
+        fig.update_xaxes(
+            type='category',
+            categoryorder='array',
+            categoryarray=category_order,
+            
+            tickmode='array',
+            tickvals=tick_vals,
+            tickangle=0
+        )
+            
+    except Exception:
+        pass
+
+
+
+
+
 INFO_COLOR = GVB_COLORS.get('Einlagen', '#0d6efd')
 
 # Pfade für Presets/Snapshots
@@ -1874,6 +1970,15 @@ def _create_pipeline_chart(
     except Exception as e:
         logger.warning(f"[Chart] Konnte Y-Achse/Cutoff nicht finalisieren: {e}")
 
+    try:
+        # X-Achsen-Formatierung (Quartale)
+        if x_range:
+             format_axis_quarters(fig, x_range)
+        elif not hist.empty:
+             format_axis_quarters(fig, hist['date'])
+    except Exception:
+        pass
+
     fig.update_traces(line_shape='linear', selector=dict(type='scatter'))
     return fig
 
@@ -2900,6 +3005,7 @@ def _compute_simple_metrics(metadata: dict) -> dict:
         "mae": None,
         "rmse": None,
         "r2": None,
+        "wape": None,
         "bias_pct": None,
         "smape": None,
         "directional": None,
@@ -2985,6 +3091,11 @@ def _compute_simple_metrics(metadata: dict) -> dict:
         cv_res_arr = np.array(cv_res, dtype=float)
         mean_resid = float(np.mean(cv_res_arr))
         bias_pct = (mean_resid / float(y_mean)) * 100.0
+
+    # WAPE berechnen (Weighted MAPE = MAE / Mean) -> robuster als MAPE/sMAPE bei Nullen
+    wape = None
+    if mae is not None and y_mean is not None and abs(y_mean) > 1e-9:
+        wape = (float(mae) / abs(float(y_mean))) * 100.0
 
     # CI-Deckung nur berechnen, wenn wir noch keine haben
     if not coverage_dict and isinstance(cv_res, list) and len(cv_res) > 0 and std_error not in (None, 0):
@@ -3082,6 +3193,7 @@ def _compute_simple_metrics(metadata: dict) -> dict:
     result.update({
         "mae": mae,
         "rmse": rmse,
+        "wape": wape,
         "r2": r2,
         "bias_pct": bias_pct,
         "smape": smape,
@@ -3881,6 +3993,7 @@ def create_pipeline_forecast(
         mae_txt   = _fmt_num(simple.get("mae"), nd=2)
         rmse_txt  = _fmt_num(simple.get("rmse"), nd=2)
         r2_txt    = _fmt_num(simple.get("r2"), nd=3)
+        wape_txt  = _fmt_pct(simple.get("wape"), nd=1)
         bias_txt  = _fmt_pct(simple.get("bias_pct"), nd=1)
         smape_txt = _fmt_pct(simple.get("smape"), nd=1)
         dir_txt   = _fmt_pct(simple.get("directional"), nd=0)
@@ -3889,41 +4002,55 @@ def create_pipeline_forecast(
         cov80 = _fmt_pct(coverage.get(80), nd=1)
         cov95 = _fmt_pct(coverage.get(95), nd=1)
 
+        # Neue UI Struktur (Anti-Confusion)
         if dbc is not None:
+            # Hilfsfunktion für Label mit Tooltip-Icon
+            def _lbl(text, tooltip_id, tooltip_text):
+                return html.Div([
+                    html.Span(text, id=tooltip_id, style={"cursor": "help", "borderBottom": "1px dotted #999"}),
+                    dbc.Tooltip(tooltip_text, target=tooltip_id, placement="right"),
+                ], className="text-muted small")
+
             metrics = dbc.Container([
                 dbc.Row(
                     dbc.Col(html.Div([
-                        html.Span("Mittlerer Schätzfehler (MAE)", className="text-muted small"),
-                        html.H4(mae_txt, className="mb-0 mt-1"),
-                        html.Div(f"Bias (Über-/Unterschätzung): {bias_txt}", className="small text-secondary mt-1"),
+                        _lbl("Relative Abweichung (WAPE)", "tt-wape", 
+                             "Durchschnittliche prozentuale Abweichung relativ zum Gesamtvolumen. "
+                             "Robust gegen Ausreißer und Nullen."),
+                        html.H4(wape_txt, className="mb-0 mt-1 fw-bold text-primary"),
+                        html.Div(f"Mittlerer Fehler (absolut): {mae_txt}", className="small text-secondary mt-1"),
                     ])),
                     className="mb-3 pb-3",
                     style={"borderBottom": "1px solid #e9ecef"},
                 ),
                 dbc.Row(
                     dbc.Col(html.Div([
-                        html.Span("Prognosegüte", className="text-muted small"),
-                        html.H4(smape_txt, className="mb-0 mt-1"),
-                        html.Div(f"Trefferquote Richtung: {dir_txt}", className="small text-secondary mt-1"),
-                    ])),
-                    className="mb-3 pb-3",
-                    style={"borderBottom": "1px solid #e9ecef"},
-                ),
-                dbc.Row(
-                    dbc.Col(html.Div([
-                        html.Span("Modellgüte", className="text-muted small"),
-                        html.H4(r2_txt, className="mb-0 mt-1"),
-                        html.Div(f"Typisches Fehlerband (RMSE): {rmse_txt}", className="small text-secondary mt-1"),
-                        html.Div(f"CI-Deckung 80/95: {cov80} / {cov95}", className="small text-secondary mt-1"),
+                        _lbl("Zuverlässigkeit (95% Intervall)", "tt-cov", 
+                             "Anteil der echten Datenpunkte, die im berechneten 95%-Sicherheitsbereich lagen. "
+                             "Ideal sind 95%."),
+                        html.H4(cov95, className="mb-0 mt-1 fw-bold text-dark"),
+                        html.Div([
+                            html.Span("Tendenz (Bias): ", id="tt-bias", style={"cursor": "help"}),
+                            html.Span(bias_txt, className=("text-success" if (simple.get("bias_pct") or 0) < 5 else "text-danger")),
+                            dbc.Tooltip("Gibt an, ob das Modell systematisch zu hoch (+) oder zu niedrig (-) schätzt.", target="tt-bias"),
+                        ], className="small text-secondary mt-1"),
                     ])),
                     className="mb-3 pb-1",
                 ),
+                # Details (eingeklappt oder klein)
+                dbc.Row(
+                    dbc.Col(html.Div([
+                        html.Div(f"Modellgüte (R²): {r2_txt}", className="text-muted small", title="Erklärte Varianz"),
+                        html.Div(f"Typischer Fehler (RMSE): {rmse_txt}", className="text-muted small", title="Wurzeltausch mittlerer quadratischer Fehler"),
+                    ])),
+                    className="mt-2 pt-2 border-top",
+                )
             ])
         else:
             metrics = html.Div([
-                html.Div([html.B("Mittlerer Schätzfehler (MAE): "), html.Span(mae_txt), html.Small(f"  | Bias: {bias_txt}")]),
-                html.Div([html.B("Prognosegüte (sMAPE): "), html.Span(smape_txt), html.Small(f"  | Richtungstreffer: {dir_txt}")]),
-                html.Div([html.B("Modellgüte (R², CV): "), html.Span(r2_txt), html.Small(f"  | Fehlerband (RMSE): {rmse_txt}  | CI-Deckung 80/95: {cov80}/{cov95}")]),
+                html.Div([html.B("WAPE (Rel. Fehler): "), html.Span(wape_txt), html.Small(f"  | Absolut (MAE): {mae_txt}")]),
+                html.Div([html.B("Zuverlässigkeit (95% CI): "), html.Span(cov95)]),
+                html.Div([html.B("Bias: "), html.Span(bias_txt)]),
             ], className="p-2")
 
         # 6) Feature-Importance

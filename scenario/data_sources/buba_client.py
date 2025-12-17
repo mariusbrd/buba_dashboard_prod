@@ -81,14 +81,14 @@ class BundesbankCSVParser:
 
             time_col, value_col = BundesbankCSVParser._identify_columns(df, code)
             result_df = pd.DataFrame()
-            time_values = df[time_col].dropna()
-            value_values = df[value_col].dropna()
-            min_len = min(len(time_values), len(value_values))
-            if min_len == 0:
-                raise ValueError("No valid data pairs found")
-
-            result_df['Datum'] = time_values.iloc[:min_len].astype(str)
-            result_df['value'] = pd.to_numeric(value_values.iloc[:min_len], errors='coerce')
+            
+            # FIX 1: Row-wise dropna to prevent truncation
+            clean = df.dropna(subset=[time_col, value_col])
+            if clean.empty:
+                raise ValueError("No valid pairs after alignment")
+            
+            result_df['Datum'] = clean[time_col].astype(str)
+            result_df['value'] = pd.to_numeric(clean[value_col], errors='coerce')
             result_df = result_df.dropna()
             if result_df.empty:
                 raise ValueError("No valid numeric data after cleaning")
@@ -171,6 +171,18 @@ class BundesbankCSVParser:
         return time_col, value_col
 # === END 1:1 COPIED PARSER ===
 
+def _apply_quarter_fix(df: pd.DataFrame) -> pd.DataFrame:
+    """Helper to fix YYYY-Qn strings before DataProcessor sees them."""
+    if "Datum" not in df.columns:
+        return df
+    s = df["Datum"].astype(str).str.strip()
+    if s.str.match(r"^\d{4}-Q[1-4]").any():
+        df["Datum"] = s.str.replace(r"-Q1", "-01-01", regex=True)\
+                       .str.replace(r"-Q2", "-04-01", regex=True)\
+                       .str.replace(r"-Q3", "-07-01", regex=True)\
+                       .str.replace(r"-Q4", "-10-01", regex=True)
+    return df
+
 async def fetch_buba_async(code: str, start: str, end: str, *, min_response_size: int, timeout_seconds: int) -> pd.DataFrame:
     # === BEGIN 1:1 COPIED LOGIC (async) ===
     url_patterns = _build_bundesbank_urls(code)
@@ -200,6 +212,8 @@ async def fetch_buba_async(code: str, start: str, end: str, *, min_response_size
                                 if text and len(text.strip()) > min_response_size:
                                     df = BundesbankCSVParser.parse(text, code)
                                     if df is not None and not df.empty:
+                                        # FIX 2: Apply Quarter Fix inline
+                                        df = _apply_quarter_fix(df)
                                         df = DataProcessor.standardize_dataframe(df)
                                         if not df.empty:
                                             return df
@@ -257,6 +271,8 @@ def fetch_buba_sync(code: str, start: str, end: str, *, min_response_size: int, 
                     if text and len(text.strip()) > min_response_size:
                         df = BundesbankCSVParser.parse(text, code)
                         if df is not None and not df.empty:
+                            # FIX 2: Apply Quarter Fix inline
+                            df = _apply_quarter_fix(df)
                             df = DataProcessor.standardize_dataframe(df)
                             if not df.empty:
                                 return df

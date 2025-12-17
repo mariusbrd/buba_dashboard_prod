@@ -47,9 +47,11 @@ except Exception:
 # --- (Optional) Projekt-Helper importieren; bei Dev-Umgebungen defensiv ---
 try:
     # Passe diese Pfade an deine tatsächliche Struktur an
+    # Passe diese Pfade an deine tatsächliche Struktur an
     from foundation import year_tickvals_biennial, window_from_slider, map_sektor
     from foundation.colors import get_category_color, get_hierarchical_color, GVB_COLOR_SEQUENCE
     from data_manager import DataManager, StoreSource, DiskSource
+    from app import format_axis_quarters # <-- NEU
 except Exception:
     # In manchen Setups kommen diese aus 'app' oder anderen Paketen; notfalls später via try/except in den Funktionen
     pass
@@ -58,6 +60,106 @@ except Exception:
 # --- Callback-Proxy: sammelt @app.callback(...) Deklarationen für spätere Registrierung
 import dash
 from dash import dcc, html, Input, Output, State, ctx, dash_table
+
+
+
+
+
+
+def format_axis_quarters(fig, date_iterable):
+    """
+    Formatiert die X-Achse als KATEGORISCH (String-basiert), um "Qx YYYY"
+    als Header im Hover zu erzwingen, während die visuelle Sortierung erhalten bleibt.
+    Ticks weiterhin nur alle 5 Jahre (z.B. Q1 2020).
+    """
+    try:
+        if date_iterable is None or len(date_iterable) == 0:
+            return
+
+        dt_index = pd.to_datetime(list(date_iterable))
+        if dt_index.empty:
+            return
+
+        min_date = dt_index.min()
+        max_date = dt_index.max()
+        
+        if pd.isna(min_date) or pd.isna(max_date):
+            return
+
+        # 1. Master-Timeline erstellen (Alle Quartale im Bereich)
+        # Damit Plotly die richtige Reihenfolge kennt (Nicht alphabetisch Q1 2021 < Q4 2020)
+        try:
+            start_q = pd.Timestamp(min_date).to_period('Q').start_time
+            end_q = pd.Timestamp(max_date).to_period('Q').end_time
+        except Exception:
+            return
+            
+        full_qs = pd.date_range(start=start_q, end=end_q, freq='QS')
+        if len(full_qs) == 0:
+            return
+
+        # Mapping: Timestamp -> "Qx YYYY"
+        # UND: Erstellen der geordneten Kategorie-Liste
+        def to_q_str(d):
+            return f"Q{d.quarter} {d.year}"
+            
+        category_order = [to_q_str(d) for d in full_qs]
+        
+        # 2. Alle Traces auf String-Werte mappen
+        for trace in fig.data:
+            if getattr(trace, 'x', None) is None:
+                continue
+            try:
+                # Altdaten (Datetimes) zu Strings konvertieren
+                ts_series = pd.to_datetime(pd.Series(trace.x), errors='coerce')
+                # NaT ignorieren/leeren
+                new_x = ts_series.apply(lambda x: to_q_str(x) if pd.notna(x) else None).tolist()
+                trace.x = new_x
+                
+                # Hovertemplate bereinigen (Header macht jetzt den Job)
+                trace.hovertemplate = "%{fullData.name}: %{y}<extra></extra>"
+            except Exception:
+                pass
+
+        # 3. Ticks berechnen (5 Jahres Abstand)
+        # Wir suchen die Strings "Q1 2020", "Q1 2025" etc.
+        min_year = min_date.year
+        max_year = max_date.year
+        tick_vals = []
+        
+        years = range(min_year, max_year + 1)
+        span = max_year - min_year
+        
+        target_years = []
+        if span >= 5:
+            target_years = [y for y in years if y % 5 == 0]
+        else:
+            target_years = list(years)
+            
+        # Wir setzen den Tick genau auf das String-Label "Q1 YYYY"
+        for y in target_years:
+            val = f"Q1 {y}"
+            if val in category_order:
+                tick_vals.append(val)
+        
+        # 4. Layout Update
+        fig.update_xaxes(
+            type='category',
+            categoryorder='array',
+            categoryarray=category_order,
+            
+            tickmode='array',
+            tickvals=tick_vals, # Die String-Literale sind jetzt die Koordinaten
+            tickangle=0
+        )
+            
+    except Exception:
+        pass
+
+
+
+
+
 
 
 class _CallbackProxy:
@@ -404,28 +506,33 @@ def update_zeitraum_slider(metadata):
         min_date = pd.to_datetime(metadata['min_date'])
         max_date = pd.to_datetime(metadata['max_date'])
         
-        # Convert to decimal year (e.g., 2024.75 for Q4 2024)
-        def date_to_decimal_year(dt):
-            year = dt.year
-            # Calculate fraction of year
-            start_of_year = datetime(year, 1, 1)
-            if year < datetime.now().year + 10:  # Safety check
-                end_of_year = datetime(year + 1, 1, 1)
-            else:
-                end_of_year = datetime(year, 12, 31, 23, 59, 59)
-            
-            year_length = (end_of_year - start_of_year).total_seconds()
-            elapsed = (dt - start_of_year).total_seconds()
-            fraction = elapsed / year_length if year_length > 0 else 0
-            
-            return year + fraction
+        # Convert to decimal year for quarter precision (2024.0, 2024.25, 2024.5, 2024.75)
+        def date_to_quarter_decimal(dt):
+            # (Month - 1) // 3 derives quarter index (0, 1, 2, 3)
+            return dt.year + ((dt.month - 1) // 3) * 0.25
+
+        slider_min = math.floor(date_to_quarter_decimal(min_date))
         
-        slider_min = math.floor(date_to_decimal_year(min_date))
-        slider_max = math.ceil(date_to_decimal_year(max_date))
+        # Calculate precise max (e.g. 2025.25 for Q2)
+        precise_max = date_to_quarter_decimal(max_date)
         
-        # Default value: show last 5 years of data
-        default_start_year = max(slider_min, slider_max - 5)
-        slider_value = [default_start_year, slider_max]
+        # Slider Scale: always full years for clean look
+        slider_max = math.ceil(precise_max)
+        
+        # If precise_max is strictly calculating the start of the quarter (e.g. 2025.0),
+        # but the data covers the full year, slider_max should just be sufficient.
+        # Ensure slider_max is at least precise_max
+        if slider_max < precise_max:
+             slider_max = math.ceil(precise_max + 0.01)
+
+        # Default value: show last 5 years up to the ACTUAL data end
+        start_target = precise_max - 5
+        start_value = max(slider_min, start_target)
+        
+        # Snap start to quarter grid as well to be safe
+        start_value = math.floor(start_value * 4) / 4.0
+
+        slider_value = [start_value, precise_max]
         
         # Generate marks - only 5-year intervals plus min and max years
         slider_marks = {}
@@ -851,16 +958,10 @@ def update_main_charts(
             height=500
         )
 
-        # X-Ticks biennal
-        idx = pd.to_datetime(pivot_df.index)
-        if len(idx):
-            years = idx.year.values
-            start_year = int(years.min())
-            mask = ((years - start_year) % 2) == 0
-            biennial = pd.Index(years[mask]).unique()
-            tickvals = [idx[idx.year == y][0] for y in biennial if (idx.year == y).any()]
-            ticktext = [f"{int(y)}" for y in biennial]
-            main_fig.update_xaxes(tickmode='array', tickvals=tickvals, ticktext=ticktext)
+        # X-Ticks: Formatierung auf Quartale
+        # Alte biennal-Logik entfernt, neue Helper-Funktion genutzt
+        format_axis_quarters(main_fig, pivot_df.index)
+
 
     # ---------- Donut (robust bei negativen Flüssen) ----------
     latest_date = grp['date'].max()
@@ -1888,24 +1989,8 @@ def update_performance_chart(
     use_log_axis = bool(use_log and not is_fluss_mode and (norm > 0).all().all())
     fig.update_yaxes(type='log' if use_log_axis else 'linear')
 
-    # X-Ticks zweijährlich
-    def _biennial_ticks(idx: pd.Index):
-        if idx.empty:
-            return None, None
-        idx = pd.to_datetime(idx)
-        years = idx.year.values
-        start_year = int(years.min())
-        mask = ((years - start_year) % 2) == 0
-        biennial_years = pd.Index(years[mask]).unique()
-        tickvals, ticktext = [], []
-        for y in biennial_years:
-            m = (idx.year == y)
-            if m.any():
-                tickvals.append(idx[m][0])
-                ticktext.append(f"{int(y)}")
-        return tickvals, ticktext
-
-    tickvals, ticktext = _biennial_ticks(norm.index)
+    # X-Ticks: Formatierung auf Quartale
+    format_axis_quarters(fig, norm.index)
 
     fig.update_layout(
         title=f"Performance-Entwicklung: {'Alle Kategorien' if focus_category in (None, 'all') else title_suffix}",
@@ -1913,10 +1998,7 @@ def update_performance_chart(
         hovermode='x unified',
         showlegend=True,
         xaxis=dict(
-            title='Jahr',
-            tickmode='array' if tickvals else 'auto',
-            tickvals=tickvals or None,
-            ticktext=ticktext or None
+            title='Jahr'
         ),
         yaxis=dict(
             title=f'Performance (Basis = 100){" — Log" if use_log_axis else ""}'

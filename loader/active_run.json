@@ -1,7 +1,7 @@
 {
   "run_cache_tag": "ph_ph_wertpapiere_fluss_h6_a90ab68e",
-  "run_loader_dir": "F:\\Dropbox\\Projekte\\BuBa_Antigravity\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251123T161108",
-  "expected_output": "F:\\Dropbox\\Projekte\\BuBa_Antigravity\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251123T161108\\output.xlsx",
+  "run_loader_dir": "F:\\Dropbox\\Projekte\\BuBa_Antigravity\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251217T122659",
+  "expected_output": "F:\\Dropbox\\Projekte\\BuBa_Antigravity\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251217T122659\\output.xlsx",
   "requested_exog": [
     "QSA.Q.N.DE.W0.S1M.S1.N.A.LE.F._Z._Z.XDC._T.S.V.N._T",
     "QSA.Q.N.DE.W0.S1M.S1._Z.B.B6G._Z._Z._Z.XDC._T.S.V.N._T",
@@ -13,5 +13,5 @@
   "ui_mode": "fluss",
   "ui_sektor": "PH",
   "horizon": 6,
-  "created_at": "2025-11-23T16:11:08.413338+00:00"
+  "created_at": "2025-12-17T12:26:59.744244+00:00"
 }
