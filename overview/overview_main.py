@@ -369,6 +369,31 @@ def initialize_data_stores(pathname, existing_data):
 
         gvb_path = next((p for p in gvb_candidates if p.exists()), None)
         if gvb_path is None:
+            # Fallback: Versuche gvb_output.xlsx zu generieren
+            logger.warning("[Init] gvb_output.xlsx nicht gefunden – versuche Neuerstellung via instructor.py")
+            try:
+                # Importiere run_instructor_loader aus app.py (falls verfügbar)
+                from app import run_instructor_loader
+                rebuilt_path = run_instructor_loader()
+                if rebuilt_path and rebuilt_path.exists():
+                    logger.info(f"[Init] ✅ gvb_output.* neu erstellt: {rebuilt_path}")
+                    # Prüfe ob es eine der Kandidaten ist oder verwende es direkt
+                    gvb_path = rebuilt_path
+                else:
+                    raise FileNotFoundError("run_instructor_loader konnte keine Datei erstellen")
+            except ImportError:
+                logger.error("[Init] run_instructor_loader nicht verfügbar (Import-Fehler)")
+                raise FileNotFoundError(
+                    f"gvb_output.xlsx nicht gefunden. Durchsucht: {[str(p) for p in gvb_candidates]}"
+                )
+            except Exception as regen_err:
+                logger.error(f"[Init] Regenerierung fehlgeschlagen: {regen_err}")
+                raise FileNotFoundError(
+                    f"gvb_output.xlsx nicht gefunden. Durchsucht: {[str(p) for p in gvb_candidates]}"
+                )
+        
+        # Wenn wir hier sind, haben wir gvb_path (entweder gefunden oder neu erstellt)
+        if gvb_path is None:
             raise FileNotFoundError(
                 f"gvb_output.xlsx nicht gefunden. Durchsucht: {[str(p) for p in gvb_candidates]}"
             )
