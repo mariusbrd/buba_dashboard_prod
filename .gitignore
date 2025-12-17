@@ -30,3 +30,5 @@ scenario/data/output.xlsx
 # Forecaster outputs
 forecaster/trained_models/
 forecaster/trained_outputs/
+
+
