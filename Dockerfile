@@ -16,6 +16,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 TZ=Europe/Berlin
 WORKDIR /app
 COPY --from=fetcher /src/ /app/
 RUN python -m pip install --upgrade pip && \
-    if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+    if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi && \
+    pip install --no-cache-dir gunicorn && \
+    chmod +x /app/start.sh
 EXPOSE 8080
-CMD ["python", "app.py"]
+CMD ["/app/start.sh"]
