@@ -1151,3 +1151,10 @@ if __name__ == "__main__":
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     run_from_config("config.yaml")
+
+
+# =============================================================================
+# Datei- und Pfad-Utilities (Schritt 8)
+# =============================================================================
+def ensure_dir(path: Union[str, Path]) -> None:
+    Path(path).mkdir(parents=True, exist_ok=True)

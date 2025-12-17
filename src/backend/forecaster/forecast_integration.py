@@ -21,6 +21,18 @@ import re
 import numpy as np
 import pandas as pd
 
+from .core.model.model_management import get_model_filepath
+
+from backend.forecaster.core.model.model_management import get_model_filepath
+
+from .core.model.model import ModelArtifact
+
+from backend.forecaster.core.model.model import ModelArtifact
+
+from .core.config import Config as PipelineConfig
+
+from backend.forecaster.core.config import Config as PipelineConfig
+
 # -------------------------
 # Logger einrichten (ohne doppelte Handler)
 # -------------------------
@@ -125,8 +137,6 @@ except Exception as e1:
             from .forecaster_pipeline import (  # type: ignore
                 PipelineConfig,
                 run_production_pipeline,
-                ModelArtifact,
-                get_model_filepath,
             )
 
             HAS_PIPELINE = True
@@ -135,10 +145,7 @@ except Exception as e1:
             try:
                 # 4) Relativ mit Config-Alias
                 from .forecaster_pipeline import (  # type: ignore
-                    Config as PipelineConfig,
                     run_production_pipeline,
-                    ModelArtifact,
-                    get_model_filepath,
                 )
 
                 HAS_PIPELINE = True
@@ -149,8 +156,6 @@ except Exception as e1:
                     from src.backend.forecaster.forecaster_pipeline import (  # type: ignore
                         PipelineConfig,
                         run_production_pipeline,
-                        ModelArtifact,
-                        get_model_filepath,
                     )
 
                     HAS_PIPELINE = True
@@ -159,10 +164,7 @@ except Exception as e1:
                     try:
                         # 6) Absoluter Import mit forecaster-Prefix + Config-Alias
                         from src.backend.forecaster.forecaster_pipeline import (  # type: ignore
-                            Config as PipelineConfig,
                             run_production_pipeline,
-                            ModelArtifact,
-                            get_model_filepath,
                         )
 
                         HAS_PIPELINE = True
