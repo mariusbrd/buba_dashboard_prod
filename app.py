@@ -4152,6 +4152,12 @@ def run_startup_preloads():
                 raise FileNotFoundError(f"scenario/config.yaml nicht gefunden unter {cfg_file}")
 
             force_refresh = os.getenv("SCENARIO_FORCE_REFRESH", "0") == "1"
+            
+            # Prüfe ob output.xlsx existiert - wenn nicht, erzwinge Download
+            output_check_path = scenario_path / "data" / "output.xlsx"
+            if not output_check_path.exists():
+                lg.warning(f"⚠️ {output_check_path} fehlt – erzwinge Szenario-Download")
+                force_refresh = True
 
             lg.info("📥 Szenario Preload (monatlich gesteuert)…")
             if force_refresh or should_run_this_month(scenario_path):
