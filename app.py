@@ -183,13 +183,15 @@ except Exception:
     APP_ROOT = Path.cwd()
 
 # Hard-Clean: diese Pfade sollen bei jedem Start/Stop geleert/gelöscht werden
+# WICHTIG: scenario/data ist NICHT hier, weil dort output.xlsx/analysis_data.xlsx
+# gespeichert werden, die beim Start heruntergeladen werden!
 ALWAYS_PURGE_PATHS = [
     APP_ROOT / "forecaster" / "trained_models",
     APP_ROOT / "forecaster" / "trained_outputs",
     APP_ROOT / "loader" / "gvb_output.parquet",
     APP_ROOT / "loader" / "gvb_output.xlsx",
     APP_ROOT / "loader" / "runs", 
-    APP_ROOT / "scenario" / "data",
+    # ENTFERNT: APP_ROOT / "scenario" / "data",  ← Enthält output.xlsx/analysis_data.xlsx!
     APP_ROOT / "scenario" / "models_scenario",
     APP_ROOT / "scenario" / "scenario_cache",
     APP_ROOT / "scenario" / ".scenario_month.stamp",
@@ -4073,7 +4075,14 @@ def run_startup_preloads():
     # nur im echten Start / Preload, nicht bei jedem Request
     self_clean_startup()
 
+    # Logger für diese Funktion
+    lg = logging.getLogger("GVB_Dashboard")
+    lg.info("=" * 60)
+    lg.info("🏦 Horn & Company GVB Dashboard – Preload")
+    lg.info("=" * 60)
+
     # Szenario Komponenten nur laden, wenn vorhanden
+    # HINWEIS: scenario/ ist bereits in sys.path (siehe Zeile ~1928)
     try:
         from scenario_dataloader import (
             DashDownloadConfig,
@@ -4084,15 +4093,10 @@ def run_startup_preloads():
         has_scenario_downloader_local = True
         lg.info("✅ scenario_dataloader erfolgreich importiert")
     except Exception as e:
-        logger.warning(f"⚠️ scenario_dataloader konnte nicht geladen werden: {e}")
+        lg.warning(f"⚠️ scenario_dataloader konnte nicht geladen werden: {e}")
         import traceback
-        logger.warning(f"Traceback: {traceback.format_exc()}")
+        lg.warning(f"Traceback: {traceback.format_exc()}")
         has_scenario_downloader_local = False
-
-    lg = logging.getLogger("GVB_Dashboard")
-    lg.info("=" * 60)
-    lg.info("🏦 Horn & Company GVB Dashboard – Preload")
-    lg.info("=" * 60)
 
     # 1) GVB Datei sicherstellen
     try:
@@ -4246,12 +4250,15 @@ def _run_preload_with_lock():
         lg.warning(f"⚠️ Preload-Lock Fehler: {e}")
 
 # Automatischer Preload beim Import (z.B. durch gunicorn)
-if os.getenv("GVB_PRELOAD_ON_IMPORT", "1") == "1":
-    _lg = logging.getLogger("GVB_Dashboard")
-    try:
-        _run_preload_with_lock()
-    except Exception as _e:
-        _lg.warning(f"⚠️ Preload beim Import fehlgeschlagen: {_e}")
+# WICHTIG: Läuft jetzt IMMER beim Import (nicht nur wenn ENV-Variable gesetzt)
+_lg = logging.getLogger("GVB_Dashboard")
+try:
+    _lg.info("🔄 Module Import: Starte Preload mit File-Lock")
+    _run_preload_with_lock()
+except Exception as _e:
+    _lg.warning(f"⚠️ Preload beim Import fehlgeschlagen: {_e}")
+    import traceback
+    _lg.warning(f"Traceback: {traceback.format_exc()}")
 
 
 # ==============================================================================
@@ -4262,8 +4269,8 @@ if __name__ == "__main__":
     lg = logging.getLogger("GVB_Dashboard")
     lg.info("🚀 Starte Dash-Server im __main__-Modus …")
 
-    # Preloads lokal ausführen
-    run_startup_preloads()
+    # Preloads lokal ausführen (falls nicht schon beim Import gelaufen)
+    # run_startup_preloads()  # Nicht nötig, läuft schon beim Import
 
     # Dash starten
     app.run(
