@@ -22,14 +22,19 @@ src/backend/loader/financial_cache/
 src/backend/loader/gvb_output.parquet
 src/backend/loader/gvb_output.xlsx
 src/backend/loader/runs/
+loader/
 
 # Scenario outputs
 src/frontend/scenario/data/analysis_data.xlsx
 src/frontend/scenario/data/output.xlsx
 src/frontend/scenario/scenario_cache/
 src/frontend/forecaster/presets/
+scenario/
 
 # Forecaster outputs
 src/backend/forecaster/trained_models/
 src/backend/forecaster/trained_outputs/
+forecaster/trained_models/
+forecaster/trained_outputs/
+
 

@@ -184,13 +184,15 @@ except Exception:
     APP_ROOT = Path.cwd()
 
 # Hard-Clean: diese Pfade sollen bei jedem Start/Stop geleert/gelöscht werden
+# WICHTIG: scenario/data ist NICHT hier, weil dort output.xlsx/analysis_data.xlsx
+# gespeichert werden, die beim Start heruntergeladen werden!
 ALWAYS_PURGE_PATHS = [
     APP_ROOT / "forecaster" / "trained_models",
     APP_ROOT / "forecaster" / "trained_outputs",
     APP_ROOT / "loader" / "gvb_output.parquet",
     APP_ROOT / "loader" / "gvb_output.xlsx",
     APP_ROOT / "loader" / "runs", 
-    APP_ROOT / "scenario" / "data",
+    # ENTFERNT: APP_ROOT / "scenario" / "data",  ← Enthält output.xlsx/analysis_data.xlsx!
     APP_ROOT / "scenario" / "models_scenario",
     APP_ROOT / "scenario" / "scenario_cache",
     APP_ROOT / "scenario" / ".scenario_month.stamp",
@@ -1187,7 +1189,51 @@ MIT automatischer Spalten-Korrektur für vertauschte bestand/fluss.
 
         # 1) Datei prüfen
         if not path.exists():
-            return pd.DataFrame()
+            # Fallback: Wenn gvb_output.xlsx fehlt (z.B. weil in .gitignore und frisch ausgecheckt),
+            # versuchen wir sie zu generieren.
+            if path.name == "gvb_output.xlsx":
+                logger.warning(f"LoadExcel | {path} fehlt – versuche instructor.py …")
+                try:
+                    # Versuche, die globale Funktion aufzurufen (falls definiert)
+                    # run_instructor_loader() liegt weiter unten im Skript
+                    rebuilt = run_instructor_loader()  # type: ignore
+                    if rebuilt and rebuilt.exists():
+                        logger.info(f"LoadExcel | benutze neu erzeugte Datei: {rebuilt}")
+                        # Wir arbeiten mit dem neuen Pfad weiter (könnte Parquet sein, aber hier erwarten wir Excel-Logik)
+                        # Da _load_excel spezifisch für Excel ist, hoffen wir, dass run_instructor_loader eine XLSX liefert oder wir sie lesen können.
+                        # run_instructor_loader returns Path.
+                        # Wenn es Parquet zurückgibt, wird pd.ExcelFile unten crashen.
+                        # ABER: Die Methode _read_any ruft _load_excel nur für .xlsx auf.
+                        # Wenn wir hier neu bauen, und run_instructor_loader gibt Parquet zurück, haben wir ein Problem,
+                        # weil wir hier in _load_excel sind.
+                        
+                        # Fix: Wenn rebuilt KEIN Excel ist, müssen wir aufgeben oder rekursiv _read_any aufrufen (geht nicht wegen self).
+                        # Wir prüfen die Extension.
+                        if rebuilt.suffix.lower() == ".xlsx":
+                            path = rebuilt
+                        else:
+                            # Falls Parquet zurückkommt, können wir es hier nicht verarbeiten (wir sind in _load_excel).
+                            # Aber wir können es in die Logik von oben durchreichen? Nein.
+                            # Wir loggen Warning und returnen empty, ABER beim nächsten Start wird _read_any Parquet nehmen.
+                            # Oder wir geben hier auf.
+                             logger.warning(f"LoadExcel | Neu erzeugte Datei ist {rebuilt.suffix} ({rebuilt}), aber Excel erwartet.")
+                             # Wir versuchen es trotzdem, vllt hat instructor AUCH xlsx erzeugt (macht es meistens).
+                             # Wir checken, ob die ursprünglich angefragte Datei jetzt existiert?
+                             if path.exists():
+                                 pass # Alles gut, path existiert jetzt
+                             else:
+                                 # Wir haben rebuilt (zB parquet) aber path (xlsx) fehlt immer noch.
+                                 return pd.DataFrame()
+                    else:
+                        return pd.DataFrame()
+                except NameError:
+                    logger.error("LoadExcel | run_instructor_loader() nicht verfügbar.")
+                    return pd.DataFrame()
+                except Exception as e:
+                    logger.error(f"LoadExcel | Generierung fehlgeschlagen: {e}")
+                    return pd.DataFrame()
+            else:
+                return pd.DataFrame()
 
         use_path = path
 
@@ -4030,7 +4076,14 @@ def run_startup_preloads():
     # nur im echten Start / Preload, nicht bei jedem Request
     self_clean_startup()
 
+    # Logger für diese Funktion
+    lg = logging.getLogger("GVB_Dashboard")
+    lg.info("=" * 60)
+    lg.info("🏦 Horn & Company GVB Dashboard – Preload")
+    lg.info("=" * 60)
+
     # Szenario Komponenten nur laden, wenn vorhanden
+    # HINWEIS: scenario/ ist bereits in sys.path (siehe Zeile ~1928)
     try:
         from src.frontend.scenario.scenario_dataloader import (
             DashDownloadConfig,
@@ -4039,14 +4092,12 @@ def run_startup_preloads():
             mark_ran_this_month,
         )
         has_scenario_downloader_local = True
+        lg.info("✅ scenario_dataloader erfolgreich importiert")
     except Exception as e:
-        logger.warning(f"⚠️ scenario_dataloader konnte nicht geladen werden: {e}")
+        lg.warning(f"⚠️ scenario_dataloader konnte nicht geladen werden: {e}")
+        import traceback
+        lg.warning(f"Traceback: {traceback.format_exc()}")
         has_scenario_downloader_local = False
-
-    lg = logging.getLogger("GVB_Dashboard")
-    lg.info("=" * 60)
-    lg.info("🏦 Horn & Company GVB Dashboard – Preload")
-    lg.info("=" * 60)
 
     # 1) GVB Datei sicherstellen
     try:
@@ -4109,24 +4160,27 @@ def run_startup_preloads():
                 raise FileNotFoundError(f"scenario/config.yaml nicht gefunden unter {cfg_file}")
 
             force_refresh = os.getenv("SCENARIO_FORCE_REFRESH", "0") == "1"
+            
+            # Prüfe ob output.xlsx existiert - wenn nicht, erzwinge Download
+            # HINWEIS: config.yaml hat output_path: "output.xlsx",
+            # scenario_dataloader._resolve_under_scenario_data() macht daraus /app/scenario/data/output.xlsx
+            output_check_path = scenario_path / "data" / "output.xlsx"
+            if not output_check_path.exists():
+                lg.warning(f"⚠️ {output_check_path} fehlt – erzwinge Szenario-Download")
+                force_refresh = True
 
             lg.info("📥 Szenario Preload (monatlich gesteuert)…")
             if force_refresh or should_run_this_month(scenario_path):
                 cfg = DashDownloadConfig.from_yaml(str(cfg_file))
-
-                # Output relativ zu scenario
+                # HINWEIS: cfg.output_path ist bereits korrekt aufgelöst durch
+                # DashDownloadConfig._resolve_under_scenario_data() → /app/scenario/data/output.xlsx
+                
                 out_path = Path(cfg.output_path)
-                if not out_path.is_absolute():
-                    out_path = scenario_path / out_path
                 out_path.parent.mkdir(parents=True, exist_ok=True)
-                cfg.output_path = str(out_path)
 
                 # Cache relativ zu scenario
                 cache_dir = Path(cfg.cache_dir)
-                if not cache_dir.is_absolute():
-                    cache_dir = scenario_path / cache_dir
                 cache_dir.mkdir(parents=True, exist_ok=True)
-                cfg.cache_dir = str(cache_dir)
 
                 lg.info(f"⏬ Lade Szenario Daten ({cfg.start_date} → {cfg.end_date}) …")
                 runner = DashDataDownloader(
@@ -4155,18 +4209,52 @@ def run_startup_preloads():
             lg.warning(f"⚠️ Konnte scenario Analyse Daten nicht initialisieren: {e}")
 
 # ==============================================================================
-# OPTIONALER IMPORT-PRELOAD (für Gunicorn & Co.)
+# OPTIONALER IMPORT-PRELOAD (für Gunicorn & Co.) mit File-Lock
 # ==============================================================================
-# Wenn z.B. im Docker-Container GVB_PRELOAD_ON_IMPORT=1 gesetzt ist und
-# ein WSGI-Server wie gunicorn mit "app:server" startet, wird der Preload
-# einmalig beim Import ausgeführt, ohne app.run() aufzurufen.
-if os.getenv("GVB_PRELOAD_ON_IMPORT", "0") == "1":
-    _lg = logging.getLogger("GVB_Dashboard")
+# Wenn z.B. im Docker-Container mit gunicorn gestartet wird, führt der erste
+# Worker die Preloads aus, während andere warten. Dies verhindert Race Conditions
+# bei der Datei-Generierung.
+
+import fcntl
+import time
+
+def _run_preload_with_lock():
+    """Führt Preload mit File-Lock aus - nur ein Worker generiert Dateien."""
+    lock_file = Path("/app/.gvb_preload.lock")  # Im App-Verzeichnis (nicht /tmp)
+    lg = logging.getLogger("GVB_Dashboard")
+    
     try:
-        _lg.info("🔁 Import-Hook: führe run_startup_preloads() aus (GVB_PRELOAD_ON_IMPORT=1)")
-        run_startup_preloads()
-    except Exception as _e:
-        _lg.warning(f"⚠️ Preload beim Import fehlgeschlagen: {_e}")
+        # Lock-Datei öffnen/erstellen
+        with open(lock_file, 'w') as f:
+            try:
+                # Versuche exklusiven Lock zu bekommen (non-blocking)
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                
+                # Wir haben den Lock - führe Preload aus
+                lg.info("🔒 Preload-Lock erhalten - führe Initialisierung aus")
+                run_startup_preloads()
+                lg.info("✅ Preload abgeschlossen")
+                
+            except BlockingIOError:
+                # Ein anderer Worker hat den Lock - warte bis er fertig ist
+                lg.info("⏳ Warte auf Preload durch anderen Worker...")
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # Blocking wait
+                lg.info("✅ Preload durch anderen Worker abgeschlossen")
+                
+    except Exception as e:
+        lg.warning(f"⚠️ Preload-Lock Fehler: {e}")
+
+# Automatischer Preload beim Import (z.B. durch gunicorn)
+# WICHTIG: Läuft jetzt IMMER beim Import (nicht nur wenn ENV-Variable gesetzt)
+_lg = logging.getLogger("GVB_Dashboard")
+try:
+    _lg.info("🔄 Module Import: Starte Preload mit File-Lock")
+    _run_preload_with_lock()
+except Exception as _e:
+    _lg.warning(f"⚠️ Preload beim Import fehlgeschlagen: {_e}")
+    import traceback
+    _lg.warning(f"Traceback: {traceback.format_exc()}")
+
 
 # ==============================================================================
 # PRELOADS (if requested)
@@ -4176,8 +4264,8 @@ if __name__ == "__main__":
     lg = logging.getLogger("GVB_Dashboard")
     lg.info("🚀 Starte Dash-Server im __main__-Modus …")
 
-    # Preloads lokal ausführen
-    run_startup_preloads()
+    # Preloads lokal ausführen (falls nicht schon beim Import gelaufen)
+    # run_startup_preloads()  # Nicht nötig, läuft schon beim Import
 
     # Dash starten
     app.run(
