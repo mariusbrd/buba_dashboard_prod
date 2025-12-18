@@ -139,7 +139,7 @@ EMPTY_GEO_MAP_HTML = build_empty_map(
 )
 
 
-logger = logging.getLogger("GeoSpacial")
+_logger = logging.getLogger("GeoSpacial")
 
 
 GEO_DIR = Path(__file__).resolve().parent  # .../geospacial
@@ -309,19 +309,19 @@ def extract_long_from_layers(layers_val: str) -> Optional[str]:
 
 def load_indicator_label_map(csv_path: Path) -> Dict[str, str]:
     if not csv_path.exists():
-        logger.info(f"[Geo] Indicator CSV nicht gefunden: {csv_path}")
+        _logger.info(f"[Geo] Indicator CSV nicht gefunden: {csv_path}")
         return {}
     try:
         df = pd.read_csv(csv_path, dtype=str)
     except Exception as e:
-        logger.warning(f"[Geo] Konnte Indicator-CSV nicht laden: {e}")
+        _logger.warning(f"[Geo] Konnte Indicator-CSV nicht laden: {e}")
         return {}
     cols_lower = {c.lower(): c for c in df.columns}
     title_col = cols_lower.get("title")
     layers_col = cols_lower.get("layers")
     tf_col = cols_lower.get("totalfeatures")
     if not title_col:
-        logger.warning("[Geo] Indicator-CSV ohne 'title'-Spalte – Mapping leer.")
+        _logger.warning("[Geo] Indicator-CSV ohne 'title'-Spalte – Mapping leer.")
         return {}
     best: Dict[str, Tuple[str, int]] = {}
     for _, row in df.iterrows():
@@ -342,7 +342,7 @@ def load_indicator_label_map(csv_path: Path) -> Dict[str, str]:
         if canon not in best or score > best[canon][1]:
             best[canon] = (long_name, score)
     mapping = {k: v[0] for k, v in best.items()}
-    logger.info(f"[Geo] Indicator-Label-Mapping geladen: {len(mapping)} Einträge.")
+    _logger.info(f"[Geo] Indicator-Label-Mapping geladen: {len(mapping)} Einträge.")
     return mapping
 
 
@@ -358,7 +358,7 @@ def _resolve_level_path(level: str) -> Optional[Path]:
 def _get_df_cached(level: str) -> Optional[pd.DataFrame]:
     path = _resolve_level_path(level)
     if not path or not path.exists():
-        logger.warning(f"[Geo] _get_df_cached: Pfad für Level '{level}' existiert nicht: {path}")
+        _logger.warning(f"[Geo] _get_df_cached: Pfad für Level '{level}' existiert nicht: {path}")
         return None
     try:
         mtime = path.stat().st_mtime_ns
@@ -369,7 +369,7 @@ def _get_df_cached(level: str) -> Optional[pd.DataFrame]:
     df = pd.read_parquet(path)
     _DF_CACHE[level] = df
     _DF_CACHE_MTIME[level] = mtime
-    logger.info(f"[Geo] Cache erneuert für Ebene '{level}': shape={df.shape}, path={path}")
+    _logger.info(f"[Geo] Cache erneuert für Ebene '{level}': shape={df.shape}, path={path}")
     # abhängige Caches leeren
     _OPTIONS_CACHE.pop(level, None)
     _NAMECOL_CACHE.pop(level, None)
@@ -388,7 +388,7 @@ def _get_available_columns(level: str) -> List[str]:
     path = _resolve_level_path(level)
     if not path or not path.exists():
         _COLUMNS_CACHE[level] = []
-        logger.warning(f"[Geo] _get_available_columns: kein Pfad für Level '{level}': {path}")
+        _logger.warning(f"[Geo] _get_available_columns: kein Pfad für Level '{level}': {path}")
         return []
 
     cols: List[str] = []
@@ -405,7 +405,7 @@ def _get_available_columns(level: str) -> List[str]:
             cols = list(df.columns) if df is not None else []
 
     _COLUMNS_CACHE[level] = cols
-    logger.info(f"[Geo] Verfügbare Spalten für Ebene '{level}': {len(cols)} Spalten.")
+    _logger.info(f"[Geo] Verfügbare Spalten für Ebene '{level}': {len(cols)} Spalten.")
     return cols
 
 
@@ -471,7 +471,7 @@ def _options_for_level(level: str, max_len: int = 40) -> List[dict]:
         )
 
     _OPTIONS_CACHE[level] = opts
-    logger.info(f"[Geo] _options_for_level('{level}'): {len(opts)} Indikator-Optionen.")
+    _logger.info(f"[Geo] _options_for_level('{level}'): {len(opts)} Indikator-Optionen.")
     return opts
 
 
@@ -482,7 +482,7 @@ def _get_indicator_slice(level: str, indicator: str) -> Optional[pd.DataFrame]:
 
     base_df = _get_df_cached(level)
     if base_df is None or indicator not in base_df.columns:
-        logger.warning(f"[Geo] _get_indicator_slice: Ebene '{level}' ohne Indikator '{indicator}'.")
+        _logger.warning(f"[Geo] _get_indicator_slice: Ebene '{level}' ohne Indikator '{indicator}'.")
         return None
 
     name_col = _detect_name_col(base_df, level)
@@ -491,7 +491,7 @@ def _get_indicator_slice(level: str, indicator: str) -> Optional[pd.DataFrame]:
         cols.insert(1, name_col)
     slice_df = base_df[cols].copy()
     _INDICATOR_SLICE_CACHE[cache_key] = slice_df
-    logger.info(
+    _logger.info(
         f"[Geo] _get_indicator_slice: level={level}, indicator={indicator}, "
         f"shape={slice_df.shape}, name_col={name_col}"
     )
@@ -505,7 +505,7 @@ def _get_region_options(level: str) -> List[dict]:
     df = _get_df_cached(level)
     if df is None:
         _REGION_OPTIONS_CACHE[level] = []
-        logger.warning(f"[Geo] _get_region_options: kein DF für Ebene '{level}'.")
+        _logger.warning(f"[Geo] _get_region_options: kein DF für Ebene '{level}'.")
         return []
 
     name_col = _detect_name_col(df, level)
@@ -523,7 +523,7 @@ def _get_region_options(level: str) -> List[dict]:
         ]
 
     _REGION_OPTIONS_CACHE[level] = opts
-    logger.info(f"[Geo] _get_region_options('{level}'): {len(opts)} Regionen.")
+    _logger.info(f"[Geo] _get_region_options('{level}'): {len(opts)} Regionen.")
     return opts
 
 
@@ -625,7 +625,7 @@ def _get_or_compute_stats(
             "mean": float(s_num.mean(skipna=True)),
         }
     _STATS_CACHE[cache_key] = stats
-    logger.info(
+    _logger.info(
         f"[Geo] Stats für level={level}, indicator={indicator}, transform={transform}: "
         f"count={stats['count']}, min={stats['min']}, max={stats['max']}, mean={stats['mean']}"
     )
@@ -646,7 +646,7 @@ def _build_minimal_map_df(base_df: pd.DataFrame, indicator_col: str, level: str)
     if indicator_col not in cols:
         cols.append(indicator_col)
     df_out = base_df[cols].copy()
-    logger.info(
+    _logger.info(
         f"[Geo] _build_minimal_map_df: level={level}, indicator={indicator_col}, "
         f"shape={df_out.shape}, columns={list(df_out.columns)}"
     )
@@ -726,13 +726,13 @@ def load_excel_kreise_data(
     - 'value': Wert aus dem jüngsten Jahr
     - 'year': Jahr (int)
     """
-    logger.info(f"[Geo] load_excel_kreise_data: Lade Excel '{excel_path_or_file}', Sheet '{sheet_name}'.")
+    _logger.info(f"[Geo] load_excel_kreise_data: Lade Excel '{excel_path_or_file}', Sheet '{sheet_name}'.")
     # 1) Header-Zeile finden
     header_row_idx = _find_header_row_for_regionalschluessel(excel_path_or_file, sheet_name)
 
     # 2) Blatt mit Header lesen
     df = pd.read_excel(excel_path_or_file, sheet_name=sheet_name, header=header_row_idx)
-    logger.info(f"[Geo] load_excel_kreise_data: Roh-DF shape={df.shape}")
+    _logger.info(f"[Geo] load_excel_kreise_data: Roh-DF shape={df.shape}")
 
     # 3) Jahrgangsspalten erkennen
     year_cols, latest_year = _detect_year_columns(df.columns.tolist())
@@ -789,7 +789,7 @@ def load_excel_kreise_data(
     slim = slim[["GKZ"] + (["Kreisname"] if "Kreisname" in slim.columns else []) + ["value", "year"]]
     slim = slim.dropna(subset=["GKZ"]).drop_duplicates(subset=["GKZ"], keep="first").reset_index(drop=True)
 
-    logger.info(
+    _logger.info(
         f"[Geo] load_excel_kreise_data: Ergebnis shape={slim.shape}, "
         f"year={latest_year}, GKZ unique={slim['GKZ'].nunique()}"
     )
@@ -833,12 +833,12 @@ def merge_with_kreise_df(
     matched = merged[indicator_name].notna().sum()
     unmatched = total - matched
     if unmatched > 0:
-        logger.warning(
+        _logger.warning(
             f"[Geo] merge_with_kreise_df: {unmatched} von {total} Kreisen ohne Excel-Zuordnung "
             f"(indicator={indicator_name})."
         )
 
-    logger.info(
+    _logger.info(
         f"[Geo] merge_with_kreise_df: indicator={indicator_name}, matched={matched}, total={total}, "
         f"shape={merged.shape}"
     )
@@ -865,7 +865,7 @@ def add_indicator_to_cache(
     _MAP_HTML_CACHE.clear()
     _INDICATOR_SLICE_CACHE.clear()
     _STATS_CACHE.clear()
-    logger.info(
+    _logger.info(
         f"[Geo] add_indicator_to_cache: level={level}, indicator={indicator_col_name}, "
         f"cached_shape={df_with_new_indicator.shape}"
     )
@@ -878,9 +878,9 @@ def _safe_to_parquet(df: pd.DataFrame, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         df.to_parquet(path, index=False, compression="snappy")
-        logger.info(f"[Geo] _safe_to_parquet: geschrieben nach {path} (snappy).")
+        _logger.info(f"[Geo] _safe_to_parquet: geschrieben nach {path} (snappy).")
     except Exception as e:
-        logger.warning(f"[Geo] _safe_to_parquet: snappy fehlgeschlagen ({e}), schreibe ohne Kompression.")
+        _logger.warning(f"[Geo] _safe_to_parquet: snappy fehlgeschlagen ({e}), schreibe ohne Kompression.")
         df.to_parquet(path, index=False)
 
 
@@ -892,16 +892,16 @@ def _safe_to_excel(df: pd.DataFrame, path: Path, *, index: bool = False) -> None
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         df.to_excel(path, index=index)
-        logger.info(f"[Geo] _safe_to_excel: geschrieben nach {path}.")
+        _logger.info(f"[Geo] _safe_to_excel: geschrieben nach {path}.")
     except Exception as e:
-        logger.warning(f"[Geo] _safe_to_excel: Schreiben nach {path} fehlgeschlagen ({e}).")
+        _logger.warning(f"[Geo] _safe_to_excel: Schreiben nach {path} fehlgeschlagen ({e}).")
 
 
 def _read_parquet_if_exists(path: Path) -> Optional[pd.DataFrame]:
     if not path.exists():
         return None
     df = pd.read_parquet(path)
-    logger.info(f"[Geo] _read_parquet_if_exists: path={path}, shape={df.shape}")
+    _logger.info(f"[Geo] _read_parquet_if_exists: path={path}, shape={df.shape}")
     return df
 
 def update_deutschlandatlas_from_vgrdl_excel(
@@ -933,7 +933,7 @@ def update_deutschlandatlas_from_vgrdl_excel(
         Dictionary mit Informationen zu allen erzeugten Indikatoren
     """
     if log is None:
-        log = lambda m: logger.info(str(m))
+        log = lambda m: _logger.info(str(m))
 
     if not excel_path.exists():
         raise FileNotFoundError(f"Excel nicht gefunden: {excel_path}")
@@ -1433,7 +1433,7 @@ def rebuild_deutschlandatlas_files(
     vgrdl_excel_name: str = "vgrdl_r2b1_bs2023.xlsx",
     export_excel: bool = False,
     force_rebuild: bool = False,
-    logger: Optional[Union[logging.Logger, Callable[[str], None]]] = None,
+    _logger: Optional[Union[logging.Logger, Callable[[str], None]]] = None,
 ) -> Dict[str, Dict[str, Union[str, int, Path]]]:
     """
     High-Level-Funktion für app.py:
@@ -1448,15 +1448,15 @@ def rebuild_deutschlandatlas_files(
         vgrdl_excel_name: Name der VGRdL-Excel-Datei
         export_excel: Wenn True, werden zusätzlich Excel-Dateien exportiert (Standard: False)
         force_rebuild: Wenn True, werden Dateien auch neu aufgebaut wenn sie existieren
-        logger: Logger-Instanz oder Callable für Logging
+        _logger: Logger-Instanz oder Callable für Logging
         
     Returns:
         Dictionary mit Informationen zu den erzeugten Dateien pro Ebene
     """
-    if isinstance(logger, logging.Logger):
-        log = lambda m: logger.info(str(m))
-    elif callable(logger):
-        log = lambda m: logger(str(m))
+    if isinstance(_logger, logging.Logger):
+        log = lambda m: _logger.info(str(m))
+    elif callable(_logger):
+        log = lambda m: _logger(str(m))
     else:
         log = lambda m: print(str(m))
 
@@ -1654,7 +1654,7 @@ def _check_and_add_vgrdl_if_missing(
 
 
 def app_preload_vgrdl(
-    logger: Optional[Union[logging.Logger, Callable[[str], None]]] = None,
+    _logger: Optional[Union[logging.Logger, Callable[[str], None]]] = None,
     force_rebuild: bool = False,
 ) -> Optional[Dict[str, Union[str, int, Path]]]:
     """
@@ -1664,19 +1664,19 @@ def app_preload_vgrdl(
     - Gibt (wie bisher) das Info-Dict der KRS-Ebene zurück, falls vorhanden
     
     Args:
-        logger: Logger-Instanz oder Callable
+        _logger: Logger-Instanz oder Callable
         force_rebuild: Erzwinge Neuaufbau auch wenn Dateien existieren
     """
-    if isinstance(logger, logging.Logger):
-        log = lambda m: logger.info(str(m))
-    elif callable(logger):
-        log = lambda m: logger(str(m))
+    if isinstance(_logger, logging.Logger):
+        log = lambda m: _logger.info(str(m))
+    elif callable(_logger):
+        log = lambda m: _logger(str(m))
     else:
         log = lambda m: print(str(m))
 
     log(f"[Geo] app_preload_vgrdl: Starte Preload für Ebene 'krs' (force_rebuild={force_rebuild}).")
     results = rebuild_deutschlandatlas_files(
-        logger=log,
+        _logger=log,
         levels=["krs"],
         force_rebuild=force_rebuild,
     )
@@ -1716,7 +1716,7 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
     Returns:
         DataFrame mit Spalten: ['GKZ', 'Kreisname_raw', 'value', 'year', 'description', 'unit', 'sheet']
     """
-    logger.info(f"[Geo] load_vgrdl_sheets_as_krs: Lade '{excel_path}'.")
+    _logger.info(f"[Geo] load_vgrdl_sheets_as_krs: Lade '{excel_path}'.")
     
     # Wenn keine Sheets angegeben, finde alle numerischen Sheets
     if sheet_names is None:
@@ -1725,7 +1725,7 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
         # ERWEITERTE Numerische Sheets: "1", "1.1", "2.1.1", "2.3.1.1", etc.
         # Pattern: Beginnt mit Ziffer, dann beliebig viele ".Ziffer" Kombinationen
         sheet_names = [s for s in xls.sheet_names if re.match(r'^\d+(\.\d+)*$', s.strip())]
-        logger.info(f"[Geo] load_vgrdl_sheets_as_krs: Gefundene numerische Sheets: {sorted(sheet_names)}")
+        _logger.info(f"[Geo] load_vgrdl_sheets_as_krs: Gefundene numerische Sheets: {sorted(sheet_names)}")
     
     if not sheet_names:
         raise ValueError("Keine numerischen Sheets gefunden oder angegeben.")
@@ -1733,12 +1733,12 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
     all_results = []
     
     for sheet_name in sheet_names:
-        logger.info(f"[Geo] load_vgrdl_sheets_as_krs: Verarbeite Sheet '{sheet_name}'...")
+        _logger.info(f"[Geo] load_vgrdl_sheets_as_krs: Verarbeite Sheet '{sheet_name}'...")
         
         try:
             raw = pd.read_excel(excel_path, sheet_name=sheet_name, header=None)
         except Exception as e:
-            logger.warning(f"[Geo] load_vgrdl_sheets_as_krs: Sheet '{sheet_name}' konnte nicht geladen werden: {e}")
+            _logger.warning(f"[Geo] load_vgrdl_sheets_as_krs: Sheet '{sheet_name}' konnte nicht geladen werden: {e}")
             continue
 
         # Beschreibung aus A1 und A2 kombinieren, Maßeinheit aus A3
@@ -1773,10 +1773,10 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
             else:
                 description = f"Sheet {sheet_name}"
                 
-            logger.info(f"[Geo] Sheet '{sheet_name}': description='{description}', unit='{unit}'")
+            _logger.info(f"[Geo] Sheet '{sheet_name}': description='{description}', unit='{unit}'")
                 
         except Exception as e:
-            logger.warning(f"[Geo] Sheet '{sheet_name}': Konnte Beschreibung/Einheit nicht auslesen: {e}")
+            _logger.warning(f"[Geo] Sheet '{sheet_name}': Konnte Beschreibung/Einheit nicht auslesen: {e}")
             description = f"Sheet {sheet_name}"
             unit = ""
 
@@ -1784,7 +1784,7 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
         try:
             hdr_idx = raw.index[(raw[0] == "Lfd. Nr.") & (raw[1] == "EU-Code")][0]
         except Exception as e:
-            logger.warning(f"[Geo] Sheet '{sheet_name}': Header nicht gefunden, überspringe: {e}")
+            _logger.warning(f"[Geo] Sheet '{sheet_name}': Header nicht gefunden, überspringe: {e}")
             continue
             
         df = raw.iloc[hdr_idx+1:].copy()
@@ -1792,7 +1792,7 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
 
         # Nur NUTS3
         if "NUTS 3" not in df.columns:
-            logger.warning(f"[Geo] Sheet '{sheet_name}': Keine 'NUTS 3' Spalte gefunden, überspringe.")
+            _logger.warning(f"[Geo] Sheet '{sheet_name}': Keine 'NUTS 3' Spalte gefunden, überspringe.")
             continue
             
         df = df[df["NUTS 3"].notna()].copy()
@@ -1800,7 +1800,7 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
         # Jahresspalten finden
         year_cols = [c for c in df.columns if isinstance(c, (int, float))]
         if not year_cols:
-            logger.warning(f"[Geo] Sheet '{sheet_name}': Keine Jahresspalten gefunden, überspringe.")
+            _logger.warning(f"[Geo] Sheet '{sheet_name}': Keine Jahresspalten gefunden, überspringe.")
             continue
             
         year = int(max(year_cols))
@@ -1827,7 +1827,7 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
             try:
                 return float(val)
             except (ValueError, TypeError):
-                logger.debug(f"[Geo] Sheet '{sheet_name}': Ungültiger Wert '{val}' -> NaN")
+                _logger.debug(f"[Geo] Sheet '{sheet_name}': Ungültiger Wert '{val}' -> NaN")
                 return None
         
         out["value"] = out["value"].apply(clean_value)
@@ -1838,7 +1838,7 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
         rows_after = len(out)
         
         if rows_before != rows_after:
-            logger.info(
+            _logger.info(
                 f"[Geo] Sheet '{sheet_name}': {rows_before - rows_after} Zeilen "
                 f"mit ungültigen Werten entfernt ({rows_after} verbleiben)"
             )
@@ -1879,7 +1879,7 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
         
         # Validierung: Stelle sicher dass value numerisch ist
         if not pd.api.types.is_numeric_dtype(out["value"]):
-            logger.warning(
+            _logger.warning(
                 f"[Geo] Sheet '{sheet_name}': value-Spalte ist nicht numerisch "
                 f"(dtype={out['value'].dtype}), konvertiere zu float"
             )
@@ -1887,7 +1887,7 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
         
         all_results.append(out)
         
-        logger.info(
+        _logger.info(
             f"[Geo] Sheet '{sheet_name}': {len(out)} Zeilen geladen "
             f"(year={year}, unique_GKZ={out['GKZ'].nunique()}, "
             f"valid_values={out['value'].notna().sum()})"
@@ -1899,7 +1899,7 @@ def load_vgrdl_sheets_as_krs(excel_path: Path, sheet_names: Optional[List[str]] 
     # Kombiniere alle Sheets
     combined = pd.concat(all_results, ignore_index=True)
     
-    logger.info(
+    _logger.info(
         f"[Geo] load_vgrdl_sheets_as_krs: Gesamt {len(combined)} Zeilen aus {len(all_results)} Sheets, "
         f"unique_GKZ={combined['GKZ'].nunique()}, valid_values={combined['value'].notna().sum()}"
     )
@@ -2023,19 +2023,19 @@ def _load_geo_forecast_from_run(cache_tag: str, ts_raw: str) -> Optional[str]:
     - None, wenn nichts geladen werden konnte
     """
     if not cache_tag or not ts_raw:
-        logger.warning("[Geo] _load_geo_forecast_from_run: cache_tag oder ts_raw leer.")
+        _logger.warning("[Geo] _load_geo_forecast_from_run: cache_tag oder ts_raw leer.")
         return None
 
     run_dir = RUNS_DIR / cache_tag / ts_raw
     if not run_dir.exists():
-        logger.warning(f"[Geo] Run-Verzeichnis nicht gefunden: {run_dir}")
+        _logger.warning(f"[Geo] Run-Verzeichnis nicht gefunden: {run_dir}")
         return None
 
     # 1) run_meta laden
     try:
         meta = _load_run_meta(run_dir)
     except Exception as e:
-        logger.error(f"[Geo] _load_geo_forecast_from_run: Konnte run_meta nicht laden: {e}")
+        _logger.error(f"[Geo] _load_geo_forecast_from_run: Konnte run_meta nicht laden: {e}")
         return None
 
     # 2) Geo-Forecast-Pfad aus Meta ziehen
@@ -2053,30 +2053,30 @@ def _load_geo_forecast_from_run(cache_tag: str, ts_raw: str) -> Optional[str]:
             try:
                 df_forecast = pd.read_excel(geo_path, sheet_name="FORECAST_TS")
             except Exception as e:
-                logger.error(
+                _logger.error(
                     f"[Geo] _load_geo_forecast_from_run: Fehler beim Lesen von "
                     f"'FORECAST_TS' aus {geo_path}: {e}"
                 )
             else:
                 if df_forecast.empty:
-                    logger.warning(
+                    _logger.warning(
                         f"[Geo] _load_geo_forecast_from_run: FORECAST_TS in {geo_path} ist leer."
                     )
                 else:
                     try:
                         return df_forecast.to_json(orient="split", date_format="iso")
                     except Exception as e_json:
-                        logger.error(
+                        _logger.error(
                             f"[Geo] _load_geo_forecast_from_run: Fehler beim Serialisieren des DF: {e_json}"
                         )
 
         else:
-            logger.warning(
+            _logger.warning(
                 f"[Geo] _load_geo_forecast_from_run: geo_forecast_path existiert nicht: {geo_path}"
             )
 
     # 3) (Optional) Fallback: nichts gefunden
-    logger.warning(
+    _logger.warning(
         f"[Geo] _load_geo_forecast_from_run: Keine Geo-Forecast-Daten für Run "
         f"{cache_tag}@{ts_raw} gefunden."
     )
@@ -2621,11 +2621,11 @@ def register_geo_callbacks(app):
         prevent_initial_call=False,
     )
     def update_indicator_and_regions(level):
-        logger.info(f"[Geo] Callback update_indicator_and_regions: level={level}")
+        _logger.info(f"[Geo] Callback update_indicator_and_regions: level={level}")
         indicator_opts = _options_for_level(level)
         indicator_val = indicator_opts[0]["value"] if indicator_opts else None
         region_opts = _get_region_options(level)
-        logger.info(
+        _logger.info(
             f"[Geo] update_indicator_and_regions: level={level}, "
             f"indicator_val={indicator_val}, regions={len(region_opts)}"
         )
@@ -2655,7 +2655,7 @@ def register_geo_callbacks(app):
         prevent_initial_call=True,
     )
     def apply_geo_filters(n_clicks, level, indicator, selected_gkz, transform):
-        logger.info(
+        _logger.info(
             f"[Geo] apply_geo_filters: n_clicks={n_clicks}, level={level}, "
             f"indicator={indicator}, selected={len(selected_gkz or [])}, transform={transform}"
         )
@@ -2667,7 +2667,7 @@ def register_geo_callbacks(app):
         if slice_df is None:
             df_full = _get_df_cached(level)
             if df_full is None or not indicator or indicator not in df_full.columns:
-                logger.warning(
+                _logger.warning(
                     f"[Geo] apply_geo_filters: Keine Daten gefunden für level={level}, indicator={indicator}."
                 )
                 return (
@@ -2734,7 +2734,7 @@ def register_geo_callbacks(app):
         else:
             base_df_full = df_full[cols_order].copy()
 
-        logger.info(
+        _logger.info(
             f"[Geo] apply_geo_filters: base_df_full shape={base_df_full.shape}, "
             f"columns={list(base_df_full.columns)}"
         )
@@ -2808,7 +2808,7 @@ def register_geo_callbacks(app):
         # Tabellen-Daten (begrenzt auf 1000 Zeilen)
         table_data = base_df[cols_order].head(1000).to_dict("records")
 
-        logger.info(
+        _logger.info(
             f"[Geo] apply_geo_filters: table_rows={len(table_data)}, "
             f"selected_set_size={len(selected_set)}, transform={transform}"
         )
@@ -2916,7 +2916,7 @@ def register_geo_callbacks(app):
                 "selected_gkz": list(selected_set),
             }
 
-        logger.info(f"[Geo] apply_geo_filters: map_input={map_input}")
+        _logger.info(f"[Geo] apply_geo_filters: map_input={map_input}")
         return map_input, table_data, column_defs, detail_children
 
     @app.callback(
@@ -2925,7 +2925,7 @@ def register_geo_callbacks(app):
         prevent_initial_call=True,
     )
     def render_map_from_store(store_data):
-        logger.info(f"[Geo] render_map_from_store: store_data={store_data}")
+        _logger.info(f"[Geo] render_map_from_store: store_data={store_data}")
         
         if not store_data or not store_data.get("has_data"):
             level = "krs"
@@ -2942,7 +2942,7 @@ def register_geo_callbacks(app):
         selected_mode = store_data.get("selected_mode", "none")
         selected_list = store_data.get("selected_gkz") or []
 
-        logger.info(
+        _logger.info(
             "[Geo] render_map_from_store: level=%s, indicator=%s, transform=%s, "
             "selected_mode=%s, selected_len=%d",
             level,
@@ -2959,7 +2959,7 @@ def register_geo_callbacks(app):
         if slice_df is None:
             df_full = _get_df_cached(level)
             if df_full is None or indicator not in df_full.columns:
-                logger.warning(
+                _logger.warning(
                     f"[Geo] render_map_from_store: Keine Daten oder Karte verfügbar "
                     f"für level={level}, indicator={indicator}."
                 )
@@ -2995,7 +2995,7 @@ def register_geo_callbacks(app):
 
         # Debug
         non_null_count = pd.to_numeric(base_df[indicator], errors="coerce").notna().sum()
-        logger.info(
+        _logger.info(
             "[Geo] render_map_from_store: base_df rows=%d, non_null_indicator=%d",
             len(base_df),
             non_null_count,
@@ -3025,7 +3025,7 @@ def register_geo_callbacks(app):
             df_for_map_wide[map_indicator] = df_for_map_wide[indicator]
         df_for_map = _build_minimal_map_df(df_for_map_wide, map_indicator, level)
 
-        logger.info(
+        _logger.info(
             "[Geo] render_map_from_store: df_for_map columns=%s, rows=%d",
             list(df_for_map.columns),
             len(df_for_map),
@@ -3037,7 +3037,7 @@ def register_geo_callbacks(app):
         # Fall A: keine Auswahl -> Vollkarte aus Cache
         if selected_mode == "none":
             if cache_key in _MAP_HTML_CACHE:
-                logger.info("[Geo] render_map_from_store: nutze gecachte Vollkarte.")
+                _logger.info("[Geo] render_map_from_store: nutze gecachte Vollkarte.")
                 return _MAP_HTML_CACHE[cache_key]
             html_map = build_map_from_df(
                 level=level,
@@ -3047,13 +3047,13 @@ def register_geo_callbacks(app):
                 indicator_desc=None,
             )
             _MAP_HTML_CACHE[cache_key] = html_map
-            logger.info("[Geo] render_map_from_store: Vollkarte neu erzeugt.")
+            _logger.info("[Geo] render_map_from_store: Vollkarte neu erzeugt.")
             return html_map
 
         # Fall B: zu viele -> Vollkarte aus Cache
         if selected_mode == "many":
             if cache_key in _MAP_HTML_CACHE:
-                logger.info("[Geo] render_map_from_store: nutze gecachte Vollkarte (many).")
+                _logger.info("[Geo] render_map_from_store: nutze gecachte Vollkarte (many).")
                 return _MAP_HTML_CACHE[cache_key]
             html_map = build_map_from_df(
                 level=level,
@@ -3063,11 +3063,11 @@ def register_geo_callbacks(app):
                 indicator_desc=None,
             )
             _MAP_HTML_CACHE[cache_key] = html_map
-            logger.info("[Geo] render_map_from_store: Vollkarte neu erzeugt (many).")
+            _logger.info("[Geo] render_map_from_store: Vollkarte neu erzeugt (many).")
             return html_map
 
         # Fall C: wenige -> neu mit visible_gkz
-        logger.info(
+        _logger.info(
             "[Geo] render_map_from_store: selected_mode=few, selected_gkz_count=%d",
             len(selected_set),
         )
@@ -3098,7 +3098,7 @@ def register_geo_callbacks(app):
         prevent_initial_call=True,
     )
     def reset_geo_filters(n_clicks):
-        logger.info(f"[Geo] reset_geo_filters: n_clicks={n_clicks}")
+        _logger.info(f"[Geo] reset_geo_filters: n_clicks={n_clicks}")
         level = "krs"
         indicator_opts = _options_for_level(level)
         indicator_val = indicator_opts[0]["value"] if indicator_opts else None
@@ -3107,7 +3107,7 @@ def register_geo_callbacks(app):
         _INDICATOR_SLICE_CACHE.clear()
         _STATS_CACHE.clear()
         _COLUMNS_CACHE.clear()
-        logger.info(
+        _logger.info(
             f"[Geo] reset_geo_filters: level={level}, indicator_val={indicator_val}, "
             f"regions={len(region_opts)}"
         )
@@ -3170,7 +3170,7 @@ def register_geo_callbacks(app):
 
         slice_df = _get_indicator_slice(level, indicator)
         if slice_df is None or indicator not in slice_df.columns:
-            logger.warning(
+            _logger.warning(
                 f"[Geo] _compute_region_shares: kein Slice für level={level}, indicator={indicator}"
             )
             return None, 1.0
@@ -3223,7 +3223,7 @@ def register_geo_callbacks(app):
         # Nur schlanke Spalten zurückgeben
         region_shares = df_sel[["GKZ", "name", "share"]].copy()
 
-        logger.info(
+        _logger.info(
             f"[Geo] _compute_region_shares: level={level}, indicator={indicator}, "
             f"mode={selected_mode}, selection_share={selection_share:.4f}, "
             f"regions={len(region_shares)}"
@@ -3379,25 +3379,25 @@ def register_geo_callbacks(app):
         try:
             decoded = base64.b64decode(content_string)
         except Exception as e:
-            logger.error(f"[Geo] Forecast-Upload: base64-Decode fehlgeschlagen: {e}")
+            _logger.error(f"[Geo] Forecast-Upload: base64-Decode fehlgeschlagen: {e}")
             return no_update, "Fehler beim Einlesen der Datei (Base64)."
 
         try:
             with io.BytesIO(decoded) as bio:
                 df_forecast = pd.read_excel(bio, sheet_name="FORECAST_TS")
         except Exception as e:
-            logger.error(f"[Geo] Forecast-Upload: Konnte Sheet 'FORECAST_TS' nicht laden: {e}")
+            _logger.error(f"[Geo] Forecast-Upload: Konnte Sheet 'FORECAST_TS' nicht laden: {e}")
             msg = f"Fehler: Sheet 'FORECAST_TS' in {filename or 'Datei'} nicht gefunden oder nicht lesbar."
             return no_update, msg
 
         if df_forecast.empty:
-            logger.warning("[Geo] Forecast-Upload: FORECAST_TS ist leer.")
+            _logger.warning("[Geo] Forecast-Upload: FORECAST_TS ist leer.")
             return no_update, "FORECAST_TS enthält keine Daten."
 
         try:
             df_json = df_forecast.to_json(orient="split", date_format="iso")
         except Exception as e:
-            logger.error(f"[Geo] Forecast-Upload: Fehler beim Serialisieren des DF: {e}")
+            _logger.error(f"[Geo] Forecast-Upload: Fehler beim Serialisieren des DF: {e}")
             return no_update, "Fehler beim Speichern der Prognosedaten."
 
         status = f"Prognose geladen aus: {filename}" if filename else "Prognose geladen."
@@ -3435,7 +3435,7 @@ def register_geo_callbacks(app):
         try:
             df_forecast = pd.read_json(forecast_json, orient="split")
         except Exception as e:
-            logger.error(f"[Geo] update_forecast_chart: Fehler beim Lesen des Forecast-JSON: {e}")
+            _logger.error(f"[Geo] update_forecast_chart: Fehler beim Lesen des Forecast-JSON: {e}")
             fig = go.Figure()
             fig.update_layout(
                 annotations=[
@@ -3497,7 +3497,7 @@ def register_geo_callbacks(app):
         try:
             df_forecast = pd.read_json(forecast_json, orient="split")
         except Exception as e:
-            logger.error(f"[Geo] update_forecast_table: Fehler beim Lesen des Forecast-JSON: {e}")
+            _logger.error(f"[Geo] update_forecast_table: Fehler beim Lesen des Forecast-JSON: {e}")
             return [], []
 
         if df_forecast.empty:
@@ -3513,7 +3513,7 @@ def register_geo_callbacks(app):
             ["forecast", "prognose", "yhat", "vorhersage"],
         )
         if not forecast_col:
-            logger.warning("[Geo] update_forecast_table: Keine Prognosespalte gefunden.")
+            _logger.warning("[Geo] update_forecast_table: Keine Prognosespalte gefunden.")
             return [], []
 
         df = df_forecast.copy()
@@ -3712,7 +3712,7 @@ def register_geo_callbacks(app):
             try:
                 runs = _discover_runs()
             except Exception as e:
-                logger.error(f"[Geo] handle_geo_runs_modal: Fehler bei _discover_runs: {e}")
+                _logger.error(f"[Geo] handle_geo_runs_modal: Fehler bei _discover_runs: {e}")
                 body = html.Div(
                     "Fehler beim Laden der gespeicherten Prognosen.",
                     className="text-danger",
@@ -3741,7 +3741,7 @@ def register_geo_callbacks(app):
 
         forecast_json = _load_geo_forecast_from_run(cache_tag, ts_raw)
         if not forecast_json:
-            logger.warning(
+            _logger.warning(
                 f"[Geo] handle_geo_runs_modal: Keine Forecast-Daten für Run "
                 f"{cache_tag}@{ts_raw} gefunden."
             )
@@ -3778,7 +3778,7 @@ def register_geo_callbacks(app):
             # letztes Event in der Liste verwenden
             event = cell_event[-1]
         else:
-            logger.warning(f"[Geo] persist_region_market_shares: Unerwartiger Typ von cell_event: {type(cell_event)}")
+            _logger.warning(f"[Geo] persist_region_market_shares: Unerwartiger Typ von cell_event: {type(cell_event)}")
             raise PreventUpdate
 
         row = event.get("data") or {}
@@ -3807,5 +3807,5 @@ def register_geo_callbacks(app):
         current_shares = current_shares or {}
         current_shares[region_name] = value
 
-        logger.info(f"[Geo] Region-Marktanteil aktualisiert: {region_name} -> {value:.1f}%")
+        _logger.info(f"[Geo] Region-Marktanteil aktualisiert: {region_name} -> {value:.1f}%")
         return current_shares

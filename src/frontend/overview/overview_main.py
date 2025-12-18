@@ -18,16 +18,16 @@ except Exception:
     APP_ROOT = Path.cwd()
 
 
-# --- Safe logging shim: vermeidet NameError für Log/logger ---
+# --- Safe logging shim: vermeidet NameError für Log/_logger ---
 import logging
-logger = logging.getLogger("GVB_Dashboard")
+_logger = logging.getLogger("GVB_Dashboard")
 
 class _SafeLog:
-    def info(self, msg): logger.info(msg)
-    def warn(self, msg): logger.warning(msg)
-    def error(self, msg): logger.error(msg)
-    def scenario(self, msg): logger.info(msg)
-    def scenario_table(self, msg): logger.info(msg)
+    def info(self, msg): _logger.info(msg)
+    def warn(self, msg): _logger.warning(msg)
+    def error(self, msg): _logger.error(msg)
+    def scenario(self, msg): _logger.info(msg)
+    def scenario_table(self, msg): _logger.info(msg)
 
 # Platzhalter (werden durch app.py via register_overview_callbacks injiziert)
 _DataManager = None
@@ -306,7 +306,7 @@ def initialize_data_stores(pathname, existing_data):
     try:
         Log.info("[Init] session=start | action=load_data")
     except Exception:
-        logger.info("[Init] session=start | action=load_data")
+        _logger.info("[Init] session=start | action=load_data")
 
     # --------- Abhängigkeiten (injected oder lazy import) ---------
     DM = globals().get("_DataManager") or globals().get("DataManager")
@@ -323,7 +323,7 @@ def initialize_data_stores(pathname, existing_data):
                 from src.backend.loader.data_manager import DataManager as _DM, StoreSource as _SS, DiskSource as _DS
                 DM, SS, DS = _DM, _SS, _DS
             except Exception as e:
-                logger.error(f"KPI-Fehler (DataManager init): {e}")
+                _logger.error(f"KPI-Fehler (DataManager init): {e}")
                 # Leeren Payload zurückgeben, damit Seite weiter rendert
                 empty_gvb = pd.DataFrame(columns=["date", "ebene1", "ebene2", "ebene3", "bestand", "fluss"])
                 empty_exog = pd.DataFrame(columns=["date"])
@@ -343,9 +343,9 @@ def initialize_data_stores(pathname, existing_data):
     try:
         # Kandidaten für gvb_output.xlsx + Diagnose-Logging (App-Root basiert)
         try:
-            logger.info(f"[Init] APP_ROOT={APP_ROOT.resolve()}")
-            logger.info(f"[Init] OVERVIEW_DIR={OVERVIEW_DIR.resolve()}")
-            logger.info(f"[Init] CWD={Path.cwd().resolve()}")
+            _logger.info(f"[Init] APP_ROOT={APP_ROOT.resolve()}")
+            _logger.info(f"[Init] OVERVIEW_DIR={OVERVIEW_DIR.resolve()}")
+            _logger.info(f"[Init] CWD={Path.cwd().resolve()}")
         except Exception:
             pass
 
@@ -361,17 +361,17 @@ def initialize_data_stores(pathname, existing_data):
             Path.cwd() / "loader" / "gvb_output.xlsx",
         ]
 
-        logger.info("[Init] Suche gvb_output.xlsx an:")
+        _logger.info("[Init] Suche gvb_output.xlsx an:")
         for cand in gvb_candidates:
             try:
-                logger.info(f"  • {cand.resolve()} | exists={cand.exists()}")
+                _logger.info(f"  • {cand.resolve()} | exists={cand.exists()}")
             except Exception as _e:
-                logger.warning(f"  • {cand} | resolve-error: {_e}")
+                _logger.warning(f"  • {cand} | resolve-error: {_e}")
 
         gvb_path = next((p for p in gvb_candidates if p.exists()), None)
         if gvb_path is None:
             # Fallback: Versuche gvb_output.xlsx zu generieren
-            logger.warning("[Init] gvb_output.xlsx nicht gefunden – versuche Neuerstellung via instructor.py")
+            _logger.warning("[Init] gvb_output.xlsx nicht gefunden – versuche Neuerstellung via instructor.py")
             try:
                 import subprocess
                 import sys
@@ -381,7 +381,7 @@ def initialize_data_stores(pathname, existing_data):
                 if not instructor_path.exists():
                     raise FileNotFoundError(f"instructor.py nicht gefunden: {instructor_path}")
                 
-                logger.info(f"[Init] Führe aus: {instructor_path}")
+                _logger.info(f"[Init] Führe aus: {instructor_path}")
                 result = subprocess.run(
                     [sys.executable, str(instructor_path)],
                     cwd=str(instructor_path.parent),
@@ -392,12 +392,12 @@ def initialize_data_stores(pathname, existing_data):
                 )
                 
                 if result.returncode != 0:
-                    logger.error(f"[Init] instructor.py fehlgeschlagen (Exit Code: {result.returncode})")
+                    _logger.error(f"[Init] instructor.py fehlgeschlagen (Exit Code: {result.returncode})")
                     if result.stderr:
-                        logger.error(f"[Init] STDERR: {result.stderr[:500]}")
+                        _logger.error(f"[Init] STDERR: {result.stderr[:500]}")
                     raise RuntimeError("instructor.py Fehler")
                 
-                logger.info("[Init] instructor.py erfolgreich ausgeführt")
+                _logger.info("[Init] instructor.py erfolgreich ausgeführt")
                 
                 # Prüfe ob Datei jetzt existiert (neu suchen)
                 gvb_path = next((p for p in gvb_candidates if p.exists()), None)
@@ -405,15 +405,15 @@ def initialize_data_stores(pathname, existing_data):
                     # Auch nach loader/gvb_output.parquet schauen
                     parquet_path = APP_ROOT / "loader" / "gvb_output.parquet"
                     if parquet_path.exists():
-                        logger.info(f"[Init] ✅ gvb_output.parquet neu erstellt: {parquet_path}")
+                        _logger.info(f"[Init] ✅ gvb_output.parquet neu erstellt: {parquet_path}")
                         gvb_path = parquet_path
                     else:
                         raise FileNotFoundError("instructor.py lief durch, aber keine Datei erstellt")
                 else:
-                    logger.info(f"[Init] ✅ gvb_output.xlsx neu erstellt: {gvb_path}")
+                    _logger.info(f"[Init] ✅ gvb_output.xlsx neu erstellt: {gvb_path}")
                     
             except Exception as regen_err:
-                logger.error(f"[Init] Regenerierung fehlgeschlagen: {regen_err}")
+                _logger.error(f"[Init] Regenerierung fehlgeschlagen: {regen_err}")
                 raise FileNotFoundError(
                     f"gvb_output.xlsx nicht gefunden. Durchsucht: {[str(p) for p in gvb_candidates]}"
                 )
@@ -425,7 +425,7 @@ def initialize_data_stores(pathname, existing_data):
             )
 
         st = gvb_path.stat()
-        logger.info(
+        _logger.info(
             "[Init] found_data_source | path=%s | size=%.1f KB",
             str(gvb_path.resolve()),
             st.st_size / 1024.0,
@@ -437,21 +437,21 @@ def initialize_data_stores(pathname, existing_data):
             gvb_sheet=None,
             exog_sheet=None
         ))
-        logger.info(f"[Init] real_data_loaded | gvb_records= {len(getattr(dm, 'gvb_data', pd.DataFrame()))} GVB-Records")
+        _logger.info(f"[Init] real_data_loaded | gvb_records= {len(getattr(dm, 'gvb_data', pd.DataFrame()))} GVB-Records")
 
     except Exception as e:
         # Fallback: synthetische Daten
-        logger.error(f"[Init] real_data_load_error | err= {e}")
-        logger.warning("[Init] using_synthetic_fallback=true")
+        _logger.error(f"[Init] real_data_load_error | err= {e}")
+        _logger.warning("[Init] using_synthetic_fallback=true")
         try:
             dm = DM(SS(
                 gvb_payload=_create_synthetic_gvb_data(),
                 exog_payload=_create_synthetic_exog_data()
             ))
             used_fallback = True
-            logger.info(f"[Init] fallback_synthetic_generated | gvb_records= {len(getattr(dm, 'gvb_data', pd.DataFrame()))} Records")
+            _logger.info(f"[Init] fallback_synthetic_generated | gvb_records= {len(getattr(dm, 'gvb_data', pd.DataFrame()))} Records")
         except Exception as e2:
-            logger.error(f"❌ KRITISCH: Auch synthetische Daten fehlgeschlagen: {e2}")
+            _logger.error(f"❌ KRITISCH: Auch synthetische Daten fehlgeschlagen: {e2}")
             # Totalausfall → leere Ergebnisse zurückgeben
             empty_gvb = pd.DataFrame(columns=["date", "ebene1", "ebene2", "ebene3", "bestand", "fluss"])
             empty_exog = pd.DataFrame(columns=["date"])
@@ -481,7 +481,7 @@ def initialize_data_stores(pathname, existing_data):
         gvb_json = gvb_df.to_json(date_format='iso', orient='split')
         exog_json = exog_df.to_json(date_format='iso', orient='split')
     except Exception as e:
-        logger.error(f"[Init] json_serialization_error | err= {e}")
+        _logger.error(f"[Init] json_serialization_error | err= {e}")
         return dash.no_update, dash.no_update, dash.no_update
 
     # --------- Metadaten ---------
@@ -500,13 +500,13 @@ def initialize_data_stores(pathname, existing_data):
             'loaded_at': datetime.now().isoformat()
         }
 
-        logger.info(
+        _logger.info(
             f"✅ Daten in Store geladen: {metadata['n_records']} Records, "
             f"Zeitraum {metadata['min_date']} - {metadata['max_date']}"
             + (" (Fallback: synthetisch)" if used_fallback else "")
         )
     except Exception as e:
-        logger.error(f"[Init] metadata_error | err= {e}")
+        _logger.error(f"[Init] metadata_error | err= {e}")
         metadata = {
             'min_date': None,
             'max_date': None,
@@ -598,12 +598,12 @@ def update_zeitraum_slider(metadata):
         if slider_max not in slider_marks:
             slider_marks[slider_max] = str(slider_max)
         
-        logger.info(f"[Slider Update] min={slider_min}, max={slider_max}, value={slider_value}")
+        _logger.info(f"[Slider Update] min={slider_min}, max={slider_max}, value={slider_value}")
         
         return slider_min, slider_max, slider_value, slider_marks
         
     except Exception as e:
-        logger.error(f"[Slider Update] Error: {e}")
+        _logger.error(f"[Slider Update] Error: {e}")
         return default_min, default_max, default_value, default_marks
 
 
@@ -1514,7 +1514,7 @@ def update_kpi_cards(timestamp, sektor_value, gvb_json, exog_json):
     try:
         df = pd.read_json(gvb_json, orient='split')
     except Exception as e:
-        logger.error(f"KPI-Fehler (read_json): {e}")
+        _logger.error(f"KPI-Fehler (read_json): {e}")
         return _placeholders()
 
     if df is None or df.empty:
@@ -1523,7 +1523,7 @@ def update_kpi_cards(timestamp, sektor_value, gvb_json, exog_json):
     # ------- Schema-Guards -------
     # Erwartet: Spalten 'date', 'ebene1', 'bestand', optional 'sektor'
     if 'date' not in df.columns or 'ebene1' not in df.columns or 'bestand' not in df.columns:
-        logger.error("[KPI] fehlende Spalten: nötig sind 'date', 'ebene1', 'bestand'")
+        _logger.error("[KPI] fehlende Spalten: nötig sind 'date', 'ebene1', 'bestand'")
         return _placeholders()
 
     # Datums-Typ
@@ -1677,7 +1677,7 @@ def update_kpi_cards(timestamp, sektor_value, gvb_json, exog_json):
 
     # Debug/Info-Log optional
     try:
-        logger.info(
+        _logger.info(
             f"[KPI] agg=ebene1 dtype=bestand sektor={sektor} | "
             f"Einlagen={e:.1f} Wertpapiere={w:.1f} Versicherungen={v:.1f} Kredite={k:.1f}"
         )
@@ -2103,7 +2103,7 @@ def update_performance_metrics(focus_category, _ts, zeitraum, gvb_json, exog_jso
     try:
         df = pd.read_json(gvb_json, orient='split')
     except Exception as e:
-        logger.error(f"[PerformanceMetrics] GVB unlesbar: {e}")
+        _logger.error(f"[PerformanceMetrics] GVB unlesbar: {e}")
         return html.Div("GVB-Daten unlesbar"), []
 
     if df is None or df.empty:

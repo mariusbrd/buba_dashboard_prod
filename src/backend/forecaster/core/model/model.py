@@ -1,5 +1,5 @@
 from backend.forecaster.core.config import Config
-from backend.forecaster.forecaster_pipeline import LOGGER
+from backend.forecaster.forecaster_pipeline import _logger
 
 
 import os
@@ -32,7 +32,7 @@ class ModelArtifact:
         }
         with open(filepath, "wb") as f:
             pickle.dump(artifact, f)
-        LOGGER.debug(f"✓ Modell gespeichert: {filepath}")
+        _logger.debug(f"✓ Modell gespeichert: {filepath}")
 
     @staticmethod
     def load(filepath: str) -> "ModelArtifact":
@@ -40,7 +40,7 @@ class ModelArtifact:
             raise FileNotFoundError(f"Modell nicht gefunden: {filepath}")
         with open(filepath, "rb") as f:
             artifact = pickle.load(f)
-        LOGGER.info(f"✓ Modell geladen: {filepath}")
+        _logger.info(f"✓ Modell geladen: {filepath}")
         return ModelArtifact(
             model=artifact["model"],
             tj=artifact["tj"],

@@ -1,5 +1,5 @@
 from typing import Dict
-from backend.forecaster.forecaster_pipeline import LOGGER
+from backend.forecaster.forecaster_pipeline import _logger
 
 
 import numpy as np
@@ -53,7 +53,7 @@ def extrapolate_with_arima(series: pd.Series, horizon: int, var_name: str = "") 
 
     s_clean = series.dropna()
     if len(s_clean) < 20:
-        LOGGER.debug(f"[ARIMA] {var_name[:50]}: Zu wenig Daten ({len(s_clean)}), Fallback")
+        _logger.debug(f"[ARIMA] {var_name[:50]}: Zu wenig Daten ({len(s_clean)}), Fallback")
         return _fallback_extrapolation(series, horizon)
 
     series_train = s_clean.iloc[-60:]
@@ -87,7 +87,7 @@ def extrapolate_with_arima(series: pd.Series, horizon: int, var_name: str = "") 
                 continue
 
     if best_model is None:
-        LOGGER.debug(f"[ARIMA] {var_name[:50]}: Alle Orders fehlgeschlagen, Fallback")
+        _logger.debug(f"[ARIMA] {var_name[:50]}: Alle Orders fehlgeschlagen, Fallback")
         return _fallback_extrapolation(series, horizon)
 
     forecast = best_model.forecast(steps=horizon)
@@ -106,7 +106,7 @@ def extrapolate_with_arima(series: pd.Series, horizon: int, var_name: str = "") 
         noise = np.cumsum(np.random.normal(0, 0.4 * hist_change_std, horizon))
         clipped = np.clip(clipped + noise, lo, hi)
 
-    LOGGER.debug(f"[ARIMA] {var_name[:50]}: Order={best_order}, AIC={best_aic:.1f}")
+    _logger.debug(f"[ARIMA] {var_name[:50]}: Order={best_order}, AIC={best_aic:.1f}")
     return clipped
 
 
@@ -158,5 +158,5 @@ def _extrapolate_drift_seasonal(
     forecast = np.clip(forecast, soft_min, soft_max)
 
     if verbose:
-        LOGGER.info(f"[FUT-EXOG] {var_name[:50]}: last={last_val:.3f}, drift={drift_per_q:.4f}, seas(*)…")
+        _logger.info(f"[FUT-EXOG] {var_name[:50]}: last={last_val:.3f}, drift={drift_per_q:.4f}, seas(*)…")
     return forecast

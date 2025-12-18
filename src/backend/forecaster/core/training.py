@@ -1,7 +1,7 @@
 from backend.forecaster.core.config import Config
 from backend.forecaster.core.metrics import expanding_splits
 from backend.forecaster.core.transform import TargetYJ
-from backend.forecaster.forecaster_pipeline import LOGGER
+from backend.forecaster.forecaster_pipeline import _logger
 
 
 import numpy as np
@@ -38,7 +38,7 @@ def train_best_model_h1(df_feats: pd.DataFrame, cfg: Config):
 
     best_params, best_score = None, np.inf
     combos = list(ParameterGrid(cfg.param_grid))
-    LOGGER.info(f"  Starte Grid-Search mit {len(combos)} Kombinationen…")
+    _logger.info(f"  Starte Grid-Search mit {len(combos)} Kombinationen…")
 
     for params in combos:
         preds = np.full(n, np.nan, dtype=float)

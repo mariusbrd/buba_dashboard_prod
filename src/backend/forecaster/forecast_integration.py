@@ -37,12 +37,12 @@ from backend.forecaster.core.config import Config as PipelineConfig
 # Logger einrichten (ohne doppelte Handler)
 # -------------------------
 LOGGER_NAME = "GVB_Dashboard"
-logger = logging.getLogger(LOGGER_NAME)
-if not logger.handlers:
+_logger = logging.getLogger(LOGGER_NAME)
+if not _logger.handlers:
     _handler = logging.StreamHandler(sys.stdout)
     _handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"))
-    logger.addHandler(_handler)
-logger.setLevel(logging.INFO)
+    _logger.addHandler(_handler)
+_logger.setLevel(logging.INFO)
 
 
 def _supports_utf8() -> bool:
@@ -64,12 +64,12 @@ def _sym(text: str) -> str:
 
 
 # Zweiter, kurz benannter Logger für den Adapter (wird in den Callbacks genutzt)
-LOGGER = logging.getLogger("DashboardForecastAdapter")
-if not LOGGER.handlers:
+_logger = logging.getLogger("DashboardForecastAdapter")
+if not _logger.handlers:
     _h = logging.StreamHandler(sys.stdout)
     _h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
-    LOGGER.addHandler(_h)
-LOGGER.setLevel(logging.INFO)
+    _logger.addHandler(_h)
+_logger.setLevel(logging.INFO)
 
 # ---------------------------------------------------------------------------
 # Pfade ermitteln und sys.path erweitern
@@ -91,9 +91,9 @@ for path_to_add in [str(FORECASTER_DIR), str(ROOT_DIR)]:
     if path_to_add not in sys.path:
         sys.path.insert(0, path_to_add)
 
-LOGGER.info(f"[Pipeline] Forecaster-Dir: {FORECASTER_DIR}")
-LOGGER.info(f"[Pipeline] Root-Dir: {ROOT_DIR}")
-LOGGER.info(f"[Pipeline] sys.path erweitert")
+_logger.info(f"[Pipeline] Forecaster-Dir: {FORECASTER_DIR}")
+_logger.info(f"[Pipeline] Root-Dir: {ROOT_DIR}")
+_logger.info(f"[Pipeline] sys.path erweitert")
 
 # ---------------------------------------------------------------------------
 # Pipeline optional importieren (robust mit Unterordner-Support)
@@ -118,7 +118,7 @@ try:
     )
 
     HAS_PIPELINE = True
-    LOGGER.info("[Pipeline] ✓ Import erfolgreich (direkter Import)")
+    _logger.info("[Pipeline] ✓ Import erfolgreich (direkter Import)")
 except Exception as e1:
     try:
         # 2) Alternativ: Config heißt 'Config' in manchen Repos
@@ -130,7 +130,7 @@ except Exception as e1:
         )
 
         HAS_PIPELINE = True
-        LOGGER.info("[Pipeline] ✓ Import erfolgreich (Config → PipelineConfig)")
+        _logger.info("[Pipeline] ✓ Import erfolgreich (Config → PipelineConfig)")
     except Exception as e2:
         try:
             # 3) Relativ (falls als Paket installiert/ausgeführt)
@@ -140,7 +140,7 @@ except Exception as e1:
             )
 
             HAS_PIPELINE = True
-            LOGGER.info("[Pipeline] ✓ Import erfolgreich (relativer Import)")
+            _logger.info("[Pipeline] ✓ Import erfolgreich (relativer Import)")
         except Exception as e3:
             try:
                 # 4) Relativ mit Config-Alias
@@ -149,7 +149,7 @@ except Exception as e1:
                 )
 
                 HAS_PIPELINE = True
-                LOGGER.info("[Pipeline] ✓ Import erfolgreich (relativ, Config → PipelineConfig)")
+                _logger.info("[Pipeline] ✓ Import erfolgreich (relativ, Config → PipelineConfig)")
             except Exception as e4:
                 try:
                     # 5) Absoluter Import mit forecaster-Prefix
@@ -159,7 +159,7 @@ except Exception as e1:
                     )
 
                     HAS_PIPELINE = True
-                    LOGGER.info("[Pipeline] ✓ Import erfolgreich (forecaster.forecaster_pipeline)")
+                    _logger.info("[Pipeline] ✓ Import erfolgreich (forecaster.forecaster_pipeline)")
                 except Exception as e5:
                     try:
                         # 6) Absoluter Import mit forecaster-Prefix + Config-Alias
@@ -168,7 +168,7 @@ except Exception as e1:
                         )
 
                         HAS_PIPELINE = True
-                        LOGGER.info("[Pipeline] ✓ Import erfolgreich (src.frontend.forecaster.forecaster_pipeline, Config → PipelineConfig)")
+                        _logger.info("[Pipeline] ✓ Import erfolgreich (src.frontend.forecaster.forecaster_pipeline, Config → PipelineConfig)")
                     except Exception as e6:
                         # Alle Versuche fehlgeschlagen → Flags setzen und Fehler protokollieren
                         HAS_PIPELINE = False
@@ -179,45 +179,45 @@ except Exception as e1:
                         run_production_pipeline = None  # type: ignore[assignment]
 
                         # Detaillierte Fehlerausgabe
-                        LOGGER.error("=" * 80)
-                        LOGGER.error("[Pipeline] ❌ ALLE Import-Versuche fehlgeschlagen!")
-                        LOGGER.error(f"[Pipeline] Forecaster-Dir: {FORECASTER_DIR}")
-                        LOGGER.error(f"[Pipeline] Root-Dir (APP_ROOT): {APP_ROOT}")
-                        LOGGER.error(f"[Pipeline] Aktuelles Verzeichnis: {Path.cwd()}")
-                        LOGGER.error(f"[Pipeline] Python-Pfad (erste 5): {sys.path[:5]}")
-                        LOGGER.error("=" * 80)
-                        LOGGER.error("[Pipeline] Fehler-Details pro Versuch:")
-                        LOGGER.error(f"  1) Direkter Import: {type(e1).__name__}: {e1}")
-                        LOGGER.error(f"  2) Config-Alias: {type(e2).__name__}: {e2}")
-                        LOGGER.error(f"  3) Relativer Import: {type(e3).__name__}: {e3}")
-                        LOGGER.error(f"  4) Relativ + Config: {type(e4).__name__}: {e4}")
-                        LOGGER.error(f"  5) forecaster.* Import: {type(e5).__name__}: {e5}")
-                        LOGGER.error(f"  6) forecaster.* + Config: {type(e6).__name__}: {e6}")
-                        LOGGER.error("=" * 80)
+                        _logger.error("=" * 80)
+                        _logger.error("[Pipeline] ❌ ALLE Import-Versuche fehlgeschlagen!")
+                        _logger.error(f"[Pipeline] Forecaster-Dir: {FORECASTER_DIR}")
+                        _logger.error(f"[Pipeline] Root-Dir (APP_ROOT): {APP_ROOT}")
+                        _logger.error(f"[Pipeline] Aktuelles Verzeichnis: {Path.cwd()}")
+                        _logger.error(f"[Pipeline] Python-Pfad (erste 5): {sys.path[:5]}")
+                        _logger.error("=" * 80)
+                        _logger.error("[Pipeline] Fehler-Details pro Versuch:")
+                        _logger.error(f"  1) Direkter Import: {type(e1).__name__}: {e1}")
+                        _logger.error(f"  2) Config-Alias: {type(e2).__name__}: {e2}")
+                        _logger.error(f"  3) Relativer Import: {type(e3).__name__}: {e3}")
+                        _logger.error(f"  4) Relativ + Config: {type(e4).__name__}: {e4}")
+                        _logger.error(f"  5) forecaster.* Import: {type(e5).__name__}: {e5}")
+                        _logger.error(f"  6) forecaster.* + Config: {type(e6).__name__}: {e6}")
+                        _logger.error("=" * 80)
 
                         # Prüfe ob forecaster_pipeline.py existiert
                         pipeline_file = FORECASTER_DIR / "forecaster_pipeline.py"
                         if pipeline_file.exists():
-                            LOGGER.error(f"[Pipeline] ✓ Datei existiert: {pipeline_file}")
-                            LOGGER.error(f"[Pipeline] Dateigröße: {pipeline_file.stat().st_size} bytes")
+                            _logger.error(f"[Pipeline] ✓ Datei existiert: {pipeline_file}")
+                            _logger.error(f"[Pipeline] Dateigröße: {pipeline_file.stat().st_size} bytes")
 
                             # Versuche die ersten Zeilen zu lesen
                             try:
                                 with open(pipeline_file, "r", encoding="utf-8") as f:
                                     first_lines = [f.readline() for _ in range(5)]
-                                LOGGER.error("[Pipeline] Erste Zeilen der Datei:")
+                                _logger.error("[Pipeline] Erste Zeilen der Datei:")
                                 for i, line in enumerate(first_lines, 1):
-                                    LOGGER.error(f"  {i}: {line.rstrip()}")
+                                    _logger.error(f"  {i}: {line.rstrip()}")
                             except Exception as read_err:
-                                LOGGER.error(f"[Pipeline] Konnte Datei nicht lesen: {read_err}")
+                                _logger.error(f"[Pipeline] Konnte Datei nicht lesen: {read_err}")
                         else:
-                            LOGGER.error(f"[Pipeline] ✗ Datei NICHT gefunden: {pipeline_file}")
-                            LOGGER.error(f"[Pipeline] Dateien im Verzeichnis:")
+                            _logger.error(f"[Pipeline] ✗ Datei NICHT gefunden: {pipeline_file}")
+                            _logger.error(f"[Pipeline] Dateien im Verzeichnis:")
                             try:
                                 for item in FORECASTER_DIR.iterdir():
-                                    LOGGER.error(f"  - {item.name}")
+                                    _logger.error(f"  - {item.name}")
                             except Exception as list_err:
-                                LOGGER.error(f"[Pipeline] Konnte Verzeichnis nicht listen: {list_err}")
+                                _logger.error(f"[Pipeline] Konnte Verzeichnis nicht listen: {list_err}")
 
 # Nach dem Guard exportieren wir klar, was dieses Modul bereitstellt
 __all__ = [
@@ -278,22 +278,22 @@ class DashboardForecastAdapter:
             cache_df = self._load_exog_from_default_cache()
             if not cache_df.empty:
                 self.exog_data = cache_df
-                LOGGER.info(
+                _logger.info(
                     "[Adapter|Exog] Cache-Fallback beim Init verwendet "
                     "(loader/financial_cache/output.xlsx)."
                 )
 
-        LOGGER.info(
+        _logger.info(
             f"[Adapter|Exog] Frame: shape="
             f"{self.exog_data.shape if hasattr(self, 'exog_data') else None}"
         )
         if not self.exog_data.empty:
-            LOGGER.info(
+            _logger.info(
                 f"[Adapter|Exog] Columns (Top): "
                 f"{self.exog_data.columns.tolist()[:12]}"
             )
             if "date" not in self.exog_data.columns:
-                LOGGER.warning(
+                _logger.warning(
                     "[Adapter|Exog] Achtung: 'date' Spalte fehlt im Exog-Frame!"
                 )
 
@@ -302,7 +302,7 @@ class DashboardForecastAdapter:
             custom_final_dataset
         )
         if self.custom_prepared_df is not None:
-            LOGGER.info(
+            _logger.info(
                 _sym(
                     f"[Adapter] Custom PIPELINE_PREP aktiv – "
                     f"shape={self.custom_prepared_df.shape}"
@@ -312,7 +312,7 @@ class DashboardForecastAdapter:
         # für Debug/Summary
         self.pipeline_info: Dict[str, object] = {}
 
-        LOGGER.info(_sym("✓ Pipeline-Integration geladen"))
+        _logger.info(_sym("✓ Pipeline-Integration geladen"))
 
         # --- INPUT DIAGNOSTICS ---------------------------------------------
         try:
@@ -333,10 +333,10 @@ class DashboardForecastAdapter:
                         diag[f"{mode}_share_zero"] = share_zero
                         diag[f"{mode}_longest_zero_run"] = int(best)
             if diag:
-                LOGGER.info(f"[DIAG|INPUT] {diag}")
+                _logger.info(f"[DIAG|INPUT] {diag}")
             self._input_diagnostics = diag
         except Exception as _e:
-            LOGGER.warning(f"[DIAG|INPUT] übersprungen: {_e}")
+            _logger.warning(f"[DIAG|INPUT] übersprungen: {_e}")
 
 
 
@@ -440,9 +440,9 @@ class DashboardForecastAdapter:
             ui_mode = "fluss" if use_flows else "bestand"
             ui_sektor = sektor or "PH"
 
-            LOGGER.info(_sym("\n[Adapter] ===== STEP 1: Dashboard-Daten vorbereiten ====="))
-            LOGGER.info("[Step1] Target=%s, Horizon=%s, Mode=%s, Sektor=%s", ui_target, horizon, ui_mode, ui_sektor)
-            LOGGER.info("[Step1] requested_exog=%s", selected_exog)
+            _logger.info(_sym("\n[Adapter] ===== STEP 1: Dashboard-Daten vorbereiten ====="))
+            _logger.info("[Step1] Target=%s, Horizon=%s, Mode=%s, Sektor=%s", ui_target, horizon, ui_mode, ui_sektor)
+            _logger.info("[Step1] requested_exog=%s", selected_exog)
 
             # ---------------------------------------------------------------------
             # 1) Exogene beschaffen – jetzt einmalig, ohne Polling
@@ -461,7 +461,7 @@ class DashboardForecastAdapter:
                 need_exog = bool(requested)
 
                 if need_exog and isinstance(cur_exog_df, pd.DataFrame) and not cur_exog_df.empty:
-                    LOGGER.info("[Step1|Exog] Initial exog_data.columns (Top): %s", list(cur_exog_df.columns)[:10])
+                    _logger.info("[Step1|Exog] Initial exog_data.columns (Top): %s", list(cur_exog_df.columns)[:10])
 
                 have_all_now = self._has_all_requested_exogs(cur_exog_df, requested)
 
@@ -469,15 +469,15 @@ class DashboardForecastAdapter:
                     # optionaler Hook, um Exogs sofort anzustoßen
                     if hasattr(self, "fetch_exogs") and callable(getattr(self, "fetch_exogs")):
                         try:
-                            LOGGER.info("[Step1|Exog] fetch_exogs() wird aufgerufen für: %s", requested)
+                            _logger.info("[Step1|Exog] fetch_exogs() wird aufgerufen für: %s", requested)
                             self.fetch_exogs(requested)
                         except Exception as _e_fetch:
-                            LOGGER.warning("[Step1|Exog] fetch_exogs() Fehler/kein Hook: %s", _e_fetch)
+                            _logger.warning("[Step1|Exog] fetch_exogs() Fehler/kein Hook: %s", _e_fetch)
 
                     # einmal versuchen, den Standard-Cache zu laden
                     cache_df = self._load_exog_from_default_cache()
                     if cache_df is not None and not cache_df.empty:
-                        LOGGER.info(
+                        _logger.info(
                             "[Step1|Exog] Default-Cache geladen: shape=%s, columns(top)=%s",
                             cache_df.shape,
                             list(cache_df.columns)[:10],
@@ -489,7 +489,7 @@ class DashboardForecastAdapter:
                                 cur = cur_exog_df.set_index("date")
                                 cache = cache_df.set_index("date")
                             except KeyError:
-                                LOGGER.warning(
+                                _logger.warning(
                                     "[Step1|Exog] Cache oder aktuelle Exogs ohne 'date'-Spalte – "
                                     "verwende bestehende exog_data unverändert."
                                 )
@@ -497,7 +497,7 @@ class DashboardForecastAdapter:
                             else:
                                 overlap = [c for c in cache.columns if c in cur.columns]
                                 if overlap:
-                                    LOGGER.info(
+                                    _logger.info(
                                         "[Step1|Exog] Cache enthält bereits vorhandene Spalten – "
                                         "Dashboard-Daten haben Vorrang: %s",
                                         overlap,
@@ -506,7 +506,7 @@ class DashboardForecastAdapter:
 
                                 merged = cur.join(cache, how="outer").reset_index()
 
-                                LOGGER.info(
+                                _logger.info(
                                     "[Step1|Exog] Exog-Union angewendet: vorher=%d Spalten, cache=%d Spalten, nachher=%d Spalten",
                                     cur_exog_df.shape[1],
                                     cache_df.shape[1],
@@ -524,7 +524,7 @@ class DashboardForecastAdapter:
                     have_all_now = self._has_all_requested_exogs(cur_exog_df, requested)
 
                     if have_all_now:
-                        LOGGER.info("[Step1|Exog] Alle angeforderten Exogs verfügbar – fahre fort.")
+                        _logger.info("[Step1|Exog] Alle angeforderten Exogs verfügbar – fahre fort.")
                     else:
                         available = set(cur_exog_df.columns) if isinstance(cur_exog_df, pd.DataFrame) else set()
                         missing = []
@@ -532,17 +532,17 @@ class DashboardForecastAdapter:
                             variants = self._exog_variants_for_name(code)
                             if not any(v in available for v in variants):
                                 missing.append(code)
-                        LOGGER.warning(
+                        _logger.warning(
                             "[Step1|Exog] Einige Exogs sind aktuell nicht verfügbar – fahre mit vorhandenen fort: %s",
                             ", ".join(missing) if missing else "<unbekannt>",
                         )
             except Exception as _e_wait:
-                LOGGER.warning("[Step1|Exog] Exog-Beschaffung (non-blocking) übersprungen: %s", _e_wait)
+                _logger.warning("[Step1|Exog] Exog-Beschaffung (non-blocking) übersprungen: %s", _e_wait)
 
             # ---------------------------------------------------------------------
             # 2) Daten für Pipeline vorbereiten
             # ---------------------------------------------------------------------
-            LOGGER.info(
+            _logger.info(
                 "[Step1] Starte prepare_pipeline_data: target=%s, requested_exogs=%s, use_flows=%s, horizon_quarters=%s",
                 ui_target,
                 list(selected_exog or []),
@@ -555,12 +555,12 @@ class DashboardForecastAdapter:
                 use_flows=use_flows,
                 horizon_quarters=int(horizon or 0),
             )
-            LOGGER.info(
+            _logger.info(
                 "[Step1] Daten für Pipeline vorbereitet: shape=%s, Spalten=%s",
                 prepared_df.shape,
                 prepared_df.columns.tolist(),
             )
-            LOGGER.debug("[Step1] Vorschau auf vorbereiteten DF:\n%s", prepared_df.head(3))
+            _logger.debug("[Step1] Vorschau auf vorbereiteten DF:\n%s", prepared_df.head(3))
 
             # ---------------------------------------------------------------------
             # 3) Exogs im DataFrame auflösen, damit wir wissen, welche wirklich da sind
@@ -625,32 +625,32 @@ class DashboardForecastAdapter:
                 "missing": missing,
             }
 
-            LOGGER.info("[Step1|ExogResolve] Gewünschte Exogs (UI): %s", requested_exogs)
-            LOGGER.info("[Step1|ExogResolve] Mapping requested→actual: %s", diag_resolve.get("mapping"))
+            _logger.info("[Step1|ExogResolve] Gewünschte Exogs (UI): %s", requested_exogs)
+            _logger.info("[Step1|ExogResolve] Mapping requested→actual: %s", diag_resolve.get("mapping"))
 
             if missing:
-                LOGGER.warning(
+                _logger.warning(
                     "[Step1|ExogResolve] %d gewünschte Exogs NICHT im Prepared-DF gefunden und werden ignoriert: %s",
                     len(missing),
                     ", ".join(missing),
                 )
-                LOGGER.debug("[Step1|ExogResolve] Prepared-DF-Spalten: %s", prepared_df.columns.tolist())
+                _logger.debug("[Step1|ExogResolve] Prepared-DF-Spalten: %s", prepared_df.columns.tolist())
 
             if resolved_exogs:
-                LOGGER.info(
+                _logger.info(
                     "[Step1|ExogResolve] %d Exogs werden effektiv an die Pipeline übergeben: %s",
                     len(resolved_exogs),
                     resolved_exogs,
                 )
             else:
-                LOGGER.warning(
+                _logger.warning(
                     "[Step1|ExogResolve] Keine Exogs im DF auflösbar – Forecast läuft ohne Exogene weiter."
                 )
 
             # ---------------------------------------------------------------------
             # 4) DataFrame auf Exog-Vollständigkeit prüfen (nicht strikt)
             # ---------------------------------------------------------------------
-            LOGGER.info(
+            _logger.info(
                 "[Step1|Guard/DF] Starte Exog-Validierung: requested_exogs=%s, resolved_exogs=%s",
                 requested_exogs,
                 list(resolved_exogs or []),
@@ -660,16 +660,16 @@ class DashboardForecastAdapter:
                     df_final=prepared_df,
                     selected_exog=requested_exogs,  # bewusst UI-Namen prüfen
                     strict=False,
-                    logger=LOGGER,
+                    _logger=_logger,
                 )
             except Exception as e_guard_df:
-                LOGGER.warning("[Step1|Guard/DF] (non-strict) Hinweis aus Exog-Validierung: %s", e_guard_df)
+                _logger.warning("[Step1|Guard/DF] (non-strict) Hinweis aus Exog-Validierung: %s", e_guard_df)
 
             # ---------------------------------------------------------------------
             # 5) Zielspalte aus UI Namen ableiten
             # ---------------------------------------------------------------------
             excel_target_col_from_ui = self._ui_target_to_excel_col(ui_target, sektor=ui_sektor)
-            LOGGER.info(
+            _logger.info(
                 "[Step1] Excel-Target aus UI abgeleitet: ui_target=%s, sektor=%s → excel_col=%s",
                 ui_target,
                 ui_sektor,
@@ -686,7 +686,7 @@ class DashboardForecastAdapter:
                 horizon=horizon,
                 selected_exog=list(resolved_exogs or []),
             )
-            LOGGER.info(
+            _logger.info(
                 "[Step1] Generierter run_cache_tag=%s (resolved_exogs=%s, horizon=%s, ui_mode=%s)",
                 run_cache_tag,
                 list(resolved_exogs or []),
@@ -704,8 +704,8 @@ class DashboardForecastAdapter:
             run_loader_dir.mkdir(parents=True, exist_ok=True)
             expected_run_output = run_loader_dir / "output.xlsx"
 
-            LOGGER.info("[Step1] Run-Verzeichnis angelegt/gefunden: %s", run_loader_dir)
-            LOGGER.info("[Step1] Erwarteter Loader-Output für diesen Run: %s", expected_run_output)
+            _logger.info("[Step1] Run-Verzeichnis angelegt/gefunden: %s", run_loader_dir)
+            _logger.info("[Step1] Erwarteter Loader-Output für diesen Run: %s", expected_run_output)
 
             # Übergabe-Datei schreiben, damit der Loader denselben Pfad nimmt
             try:
@@ -727,13 +727,13 @@ class DashboardForecastAdapter:
                     json.dumps(handover_payload, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
-                LOGGER.info("[Step1] Übergabe-Datei für Loader geschrieben: %s", handover_path)
-                LOGGER.debug(
+                _logger.info("[Step1] Übergabe-Datei für Loader geschrieben: %s", handover_path)
+                _logger.debug(
                     "[Step1] Inhalt Übergabe-Datei (active_run.json): %s",
                     json.dumps(handover_payload, ensure_ascii=False),
                 )
             except Exception as _e_handover:
-                LOGGER.warning("[Step1] Übergabe-Datei konnte nicht geschrieben werden: %s", _e_handover)
+                _logger.warning("[Step1] Übergabe-Datei konnte nicht geschrieben werden: %s", _e_handover)
 
             # ---------------------------------------------------------------------
             # 8) Loader-Quelle nur feststellen (non-blocking)
@@ -741,21 +741,21 @@ class DashboardForecastAdapter:
             global_loader_xlsx = base_dir / "loader" / "financial_cache" / "output.xlsx"
             if expected_run_output.exists():
                 loader_source = "run"
-                LOGGER.info(
+                _logger.info(
                     "[Step1] Loader-Output bereits run-spezifisch vorhanden – wird in Step 2 bevorzugt."
                 )
             elif global_loader_xlsx.exists():
                 loader_source = "global"
-                LOGGER.info(
+                _logger.info(
                     "[Step1] Kein run-spezifischer Loader-Output, aber globaler Loader-Output vorhanden."
                 )
             else:
                 loader_source = "none"
-                LOGGER.error(
+                _logger.error(
                     "[Step1] Weder run-spezifischer noch globaler Loader-Output sind aktuell vorhanden – "
                     "Step 2 wird eigenes Excel erzeugen."
                 )
-            LOGGER.debug(
+            _logger.debug(
                 "[Step1] Loader-Check: expected_run_output=%s exists=%s, global_loader_xlsx=%s exists=%s",
                 expected_run_output,
                 expected_run_output.exists(),
@@ -777,7 +777,7 @@ class DashboardForecastAdapter:
                 pi["expected_run_output"] = str(expected_run_output)
                 pi["loader_source"] = loader_source
                 self.pipeline_info = pi
-                LOGGER.debug("[Step1] pipeline_info aktualisiert: %s", pi)
+                _logger.debug("[Step1] pipeline_info aktualisiert: %s", pi)
 
             # ---------------------------------------------------------------------
             # 10) Kontext zurückgeben
@@ -827,7 +827,7 @@ class DashboardForecastAdapter:
         import os
         import pandas as pd  # wir brauchen das hier zum Spalten-Check
 
-        LOGGER.info(_sym("\n[Adapter] ===== STEP 2: Excel und Config ====="))
+        _logger.info(_sym("\n[Adapter] ===== STEP 2: Excel und Config ====="))
 
         prepared_df: pd.DataFrame = ctx["prepared_df"]
         resolved_exogs: list[str] = ctx["resolved_exogs"]
@@ -861,7 +861,7 @@ class DashboardForecastAdapter:
                 excel_target_detected = non_dt[0] if non_dt else None
                 return cols, excel_target_detected
             except Exception as _e_cols:
-                LOGGER.warning(f"[Step2|Reuse] Konnte Excel {path} nicht inspizieren: {_e_cols}")
+                _logger.warning(f"[Step2|Reuse] Konnte Excel {path} nicht inspizieren: {_e_cols}")
                 return [], None
 
         # ------------------------------------------------------------------
@@ -875,7 +875,7 @@ class DashboardForecastAdapter:
         if runs_dir.exists() and runs_dir not in candidate_dirs:
             candidate_dirs.append(runs_dir)
 
-        LOGGER.info(
+        _logger.info(
             f"[Step2|Reuse] Suche Run-Excels in {len(candidate_dirs)} Ordner(n): "
             + ", ".join(str(d) for d in candidate_dirs)
         )
@@ -887,10 +887,10 @@ class DashboardForecastAdapter:
                 reverse=True,
             )
             if not candidates:
-                LOGGER.info(f"[Step2|Reuse] Keine *_final_dataset.xlsx unter {search_dir}")
+                _logger.info(f"[Step2|Reuse] Keine *_final_dataset.xlsx unter {search_dir}")
                 continue
 
-            LOGGER.info(
+            _logger.info(
                 f"[Step2|Reuse] Ordner {search_dir} – {len(candidates)} Kandidat(en) zum Wiederverwenden gefunden"
             )
 
@@ -907,10 +907,10 @@ class DashboardForecastAdapter:
                         try:
                             with mp.open("r", encoding="utf-8") as fh:
                                 meta = json.load(fh)
-                            LOGGER.info(f"[Step2|Reuse] Meta-Datei zu {cand.name} gefunden: {mp.name}")
+                            _logger.info(f"[Step2|Reuse] Meta-Datei zu {cand.name} gefunden: {mp.name}")
                             break
                         except Exception as _e_meta:
-                            LOGGER.warning(f"[Step2|Reuse] Konnte Meta-Datei {mp} nicht lesen: {_e_meta}")
+                            _logger.warning(f"[Step2|Reuse] Konnte Meta-Datei {mp} nicht lesen: {_e_meta}")
 
                 selected_exogs_current = list(resolved_exogs or [])
 
@@ -925,7 +925,7 @@ class DashboardForecastAdapter:
                     )
 
                     if not meta_ok:
-                        LOGGER.info(
+                        _logger.info(
                             f"[Step2|Reuse] Kandidat {cand.name} in {search_dir} verworfen – Meta passt nicht."
                         )
                         continue
@@ -934,7 +934,7 @@ class DashboardForecastAdapter:
                     if meta_target and meta_target == excel_target_col_from_ui:
                         reused_excel_path = cand
                         excel_target_col = meta_target
-                        LOGGER.info(f"[Step2] ✓ Früheren Run wiederverwendet (Meta-Match): {cand}")
+                        _logger.info(f"[Step2] ✓ Früheren Run wiederverwendet (Meta-Match): {cand}")
                         break
                     else:
                         # zur Sicherheit noch die tatsächlichen Spalten prüfen
@@ -942,10 +942,10 @@ class DashboardForecastAdapter:
                         if detected_target and detected_target == excel_target_col_from_ui:
                             reused_excel_path = cand
                             excel_target_col = detected_target
-                            LOGGER.info(f"[Step2] ✓ Früheren Run wiederverwendet (Excel-Match): {cand}")
+                            _logger.info(f"[Step2] ✓ Früheren Run wiederverwendet (Excel-Match): {cand}")
                             break
                         else:
-                            LOGGER.info(
+                            _logger.info(
                                 f"[Step2|Reuse] Kandidat {cand.name} verworfen – Target in Excel/Meta stimmt nicht."
                             )
                             continue
@@ -956,7 +956,7 @@ class DashboardForecastAdapter:
                         continue
 
                     if detected_target != excel_target_col_from_ui:
-                        LOGGER.info(
+                        _logger.info(
                             f"[Step2|Reuse] Kandidat {cand.name} verworfen – Target {detected_target}≠{excel_target_col_from_ui}"
                         )
                         continue
@@ -965,10 +965,10 @@ class DashboardForecastAdapter:
                     if excel_exogs == set(selected_exogs_current):
                         reused_excel_path = cand
                         excel_target_col = detected_target
-                        LOGGER.info(f"[Step2] ✓ Früheren Run wiederverwendet (Excel-only-Match): {cand}")
+                        _logger.info(f"[Step2] ✓ Früheren Run wiederverwendet (Excel-only-Match): {cand}")
                         break
                     else:
-                        LOGGER.info(
+                        _logger.info(
                             f"[Step2|Reuse] Kandidat {cand.name} verworfen – Exogs im Excel ≠ aktuelle Exogs."
                         )
 
@@ -982,7 +982,7 @@ class DashboardForecastAdapter:
         if reused_excel_path:
             temp_excel_path = reused_excel_path
         else:
-            LOGGER.info("[Step2] Keine passende Run-Excel gefunden – erzeuge neue Run-Excel.")
+            _logger.info("[Step2] Keine passende Run-Excel gefunden – erzeuge neue Run-Excel.")
 
             # wenn wir einen lauf-spezifischen Ordner haben, legen wir dort ab
             if run_loader_dir.exists():
@@ -995,10 +995,10 @@ class DashboardForecastAdapter:
                 df_export = prepared_df.rename(columns=rename_map).copy()
                 df_export["Datum"] = pd.to_datetime(df_export["Datum"], errors="coerce")
 
-                LOGGER.info(_sym("\n[Step2] Excel-Export (run-spezifisch):"))
-                LOGGER.info(f"  Ziel: {temp_excel_path}")
-                LOGGER.info(f"  Shape: {df_export.shape}")
-                LOGGER.info(f"  Spalten: {df_export.columns.tolist()}")
+                _logger.info(_sym("\n[Step2] Excel-Export (run-spezifisch):"))
+                _logger.info(f"  Ziel: {temp_excel_path}")
+                _logger.info(f"  Shape: {df_export.shape}")
+                _logger.info(f"  Spalten: {df_export.columns.tolist()}")
 
                 df_export.to_excel(temp_excel_path, sheet_name="final_dataset", index=False)
                 excel_target_col = excel_target_col_from_ui
@@ -1007,7 +1007,7 @@ class DashboardForecastAdapter:
                 try:
                     _ = pd.read_excel(temp_excel_path, sheet_name="final_dataset", nrows=1)
                 except Exception as _e_val:
-                    LOGGER.warning(f"[Step2] Konnte frisch erzeugte Excel nicht validieren: {_e_val}")
+                    _logger.warning(f"[Step2] Konnte frisch erzeugte Excel nicht validieren: {_e_val}")
             else:
                 # Fallback: altes Verhalten
                 excel_ret = self.create_temp_excel(
@@ -1046,9 +1046,9 @@ class DashboardForecastAdapter:
                 )
                 with meta_name.open("w", encoding="utf-8") as fh:
                     json.dump(meta_out, fh, ensure_ascii=False, indent=2)
-                LOGGER.info(f"[Step2] Meta-Datei für Run geschrieben: {meta_name}")
+                _logger.info(f"[Step2] Meta-Datei für Run geschrieben: {meta_name}")
             except Exception as _e_meta_write:
-                LOGGER.warning(f"[Step2] Konnte Meta-Datei nicht schreiben: {_e_meta_write}")
+                _logger.warning(f"[Step2] Konnte Meta-Datei nicht schreiben: {_e_meta_write}")
 
         # ------------------------------------------------------------------
         # 2c) Exog-Validierung in Excel (jetzt strikt, weil Run-Excel)
@@ -1058,7 +1058,7 @@ class DashboardForecastAdapter:
             selected_exog=list(resolved_exogs or []),
             sheet_name="final_dataset",
             strict=True,
-            logger=LOGGER,
+            _logger=_logger,
         )
 
         # ------------------------------------------------------------------
@@ -1110,7 +1110,7 @@ class DashboardForecastAdapter:
                 )
 
                 if not is_ok:
-                    LOGGER.warning(
+                    _logger.warning(
                         "[Step2|Preload] Preload-Metadaten passen nicht zum aktuellen UI-Setup – Preload wird ignoriert."
                     )
                 else:
@@ -1133,12 +1133,12 @@ class DashboardForecastAdapter:
                         if hasattr(art_fix, "save"):
                             art_fix.save(exp_path)
                     except Exception as _e_fix:
-                        LOGGER.warning(f"[Step2|Preload] Konnte Ziel-Metadata nicht aktualisieren: {_e_fix}")
+                        _logger.warning(f"[Step2|Preload] Konnte Ziel-Metadata nicht aktualisieren: {_e_fix}")
 
-                    LOGGER.info(f"[Step2] ✓ Preloaded Modell übernommen: {preload_model_path} → {exp_path}")
+                    _logger.info(f"[Step2] ✓ Preloaded Modell übernommen: {preload_model_path} → {exp_path}")
                     accepted_preload = True
             except Exception as _e_pl:
-                LOGGER.warning(f"[Step2|Preload] Konnte Preload-PKL nicht verwenden: {_e_pl}")
+                _logger.warning(f"[Step2|Preload] Konnte Preload-PKL nicht verwenden: {_e_pl}")
 
         # ------------------------------------------------------------------
         # 2f) Cache auf Mismatch prüfen – mit aktuellem Setup abgleichen
@@ -1163,20 +1163,20 @@ class DashboardForecastAdapter:
                 )
 
                 if not is_ok:
-                    LOGGER.warning("\n[Step2|Cache] Modell im Cache passt nicht zum aktuellen Setup – wird gelöscht.")
-                    LOGGER.warning(f"[Step2|Cache] Gefundene Meta: {meta_art}")
+                    _logger.warning("\n[Step2|Cache] Modell im Cache passt nicht zum aktuellen Setup – wird gelöscht.")
+                    _logger.warning(f"[Step2|Cache] Gefundene Meta: {meta_art}")
                     try:
                         os.remove(model_path)
                     except Exception as _e_rm:
-                        LOGGER.warning(f"[Step2|Cache] Konnte Cache nicht löschen: {_e_rm}")
+                        _logger.warning(f"[Step2|Cache] Konnte Cache nicht löschen: {_e_rm}")
                     force_retrain = True
             except Exception as _e_load:
-                LOGGER.warning(f"[Step2|Cache] Konnte Cache nicht prüfen: {_e_load}")
+                _logger.warning(f"[Step2|Cache] Konnte Cache nicht prüfen: {_e_load}")
 
         # ------------------------------------------------------------------
         # 2g) Config Summary
         # ------------------------------------------------------------------
-        LOGGER.info("\n[Step2] Config summary:")
+        _logger.info("\n[Step2] Config summary:")
         for k in [
             "forecast_horizon",
             "agg_method_target",
@@ -1190,12 +1190,12 @@ class DashboardForecastAdapter:
             "target_transform",
             "target_standardize",
         ]:
-            LOGGER.info(f"  {k}: {getattr(cfg, k, None)}")
-        LOGGER.info(f"  Excel: {cfg.excel_path}")
-        LOGGER.info(f"  Model dir: {cfg.model_dir}")
-        LOGGER.info(f"  selected_exog/exog_cols: {getattr(cfg, 'selected_exog', [])}")
-        LOGGER.info(f"  Excel target col: {excel_target_col}")
-        LOGGER.info(f"  Loader-Quelle aus Step 1: {loader_source}")
+            _logger.info(f"  {k}: {getattr(cfg, k, None)}")
+        _logger.info(f"  Excel: {cfg.excel_path}")
+        _logger.info(f"  Model dir: {cfg.model_dir}")
+        _logger.info(f"  selected_exog/exog_cols: {getattr(cfg, 'selected_exog', [])}")
+        _logger.info(f"  Excel target col: {excel_target_col}")
+        _logger.info(f"  Loader-Quelle aus Step 1: {loader_source}")
 
         return {
             **ctx,
@@ -1210,15 +1210,15 @@ class DashboardForecastAdapter:
         """
         Schritt 3: Pipeline wirklich ausführen, Metadata ergänzen, Snapshot schreiben.
         """
-        LOGGER.info(_sym("\n[Adapter] ===== STEP 3: Pipeline ausführen ====="))
+        _logger.info(_sym("\n[Adapter] ===== STEP 3: Pipeline ausführen ====="))
 
         cfg = ctx["cfg"]
         force_retrain = ctx["force_retrain"]
         prepared_df: pd.DataFrame = ctx["prepared_df"]
 
-        LOGGER.info(_sym("\n[Adapter] Starte Pipeline."))
-        LOGGER.info(f"  Cache: {'verwendet' if getattr(cfg, 'use_cached_model', False) else 'ignoriere'}")
-        LOGGER.info(f"  Force-Retrain: {force_retrain}")
+        _logger.info(_sym("\n[Adapter] Starte Pipeline."))
+        _logger.info(f"  Cache: {'verwendet' if getattr(cfg, 'use_cached_model', False) else 'ignoriere'}")
+        _logger.info(f"  Force-Retrain: {force_retrain}")
         forecast_df, metadata = run_production_pipeline(cfg, force_retrain)
 
         # Modellpfad ermitteln
@@ -1265,7 +1265,7 @@ class DashboardForecastAdapter:
         import numpy as np
         import pandas as pd  # damit wir hier sicher sind
 
-        LOGGER.info(_sym("\n[Adapter] ===== STEP 4: Ergebnis anreichern ====="))
+        _logger.info(_sym("\n[Adapter] ===== STEP 4: Ergebnis anreichern ====="))
 
         forecast_df: pd.DataFrame = ctx["forecast_df"]
         metadata: dict = ctx.get("metadata") or {}
@@ -1286,12 +1286,12 @@ class DashboardForecastAdapter:
         # 4a) Konfidenzintervalle
         # ------------------------------------------------------------------
         if forecast_df is None or forecast_df.empty:
-            LOGGER.warning("[CI] Forecast-DataFrame ist leer – CI wird übersprungen.")
+            _logger.warning("[CI] Forecast-DataFrame ist leer – CI wird übersprungen.")
             diagnostics_ci["applied"] = False
             diagnostics_ci["reason"] = "empty_forecast"
         else:
             try:
-                LOGGER.info(_sym("\n[Adapter] Berechne Konfidenzintervalle"))
+                _logger.info(_sym("\n[Adapter] Berechne Konfidenzintervalle"))
                 residuals = self._extract_residuals_from_pipeline(metadata, model_path)
 
                 # wenn nichts brauchbares zurückkam → versuchen wir cv_rmse
@@ -1304,7 +1304,7 @@ class DashboardForecastAdapter:
                         cv_rmse = None
 
                     if cv_rmse and np.isfinite(cv_rmse):
-                        LOGGER.warning(
+                        _logger.warning(
                             f"[CI] Keine Residuen gefunden – erzeuge synthetische Residuen (RMSE={cv_rmse:.4f}, n=100)"
                         )
                         rng = np.random.default_rng(42)
@@ -1312,7 +1312,7 @@ class DashboardForecastAdapter:
                         diagnostics_ci["residual_source"] = "synthetic_from_cv_rmse"
                         diagnostics_ci["cv_rmse"] = float(cv_rmse)
                     else:
-                        LOGGER.warning("[CI] Keine Residuen verfügbar und kein CV-RMSE – CI werden übersprungen")
+                        _logger.warning("[CI] Keine Residuen verfügbar und kein CV-RMSE – CI werden übersprungen")
                         diagnostics_ci["applied"] = False
                         diagnostics_ci["reason"] = "no_residuals_and_no_cv_rmse"
                         residuals = None
@@ -1331,7 +1331,7 @@ class DashboardForecastAdapter:
                         forecast_col = found or "Forecast"
 
                     if forecast_col not in forecast_df.columns:
-                        LOGGER.warning(
+                        _logger.warning(
                             "[CI] Keine passende Forecast-Spalte gefunden – CI wird nicht angefügt (gesucht wurde z.B. 'Forecast')."
                         )
                         diagnostics_ci["applied"] = False
@@ -1355,11 +1355,11 @@ class DashboardForecastAdapter:
                         diagnostics_ci["applied"] = True
                         diagnostics_ci["used_forecast_col"] = forecast_col
                         diagnostics_ci["confidence_levels"] = confidence_levels
-                        LOGGER.info("[CI] Konfidenzintervalle erfolgreich hinzugefügt")
-                        LOGGER.info(f"[CI] Forecast-Spalten: {forecast_df.columns.tolist()}")
+                        _logger.info("[CI] Konfidenzintervalle erfolgreich hinzugefügt")
+                        _logger.info(f"[CI] Forecast-Spalten: {forecast_df.columns.tolist()}")
             except Exception as e_ci:
-                LOGGER.error(f"[CI] Fehler bei Konfidenzintervall-Berechnung: {e_ci}")
-                LOGGER.warning("[CI] Forecast wird ohne Konfidenzintervalle zurückgegeben")
+                _logger.error(f"[CI] Fehler bei Konfidenzintervall-Berechnung: {e_ci}")
+                _logger.warning("[CI] Forecast wird ohne Konfidenzintervalle zurückgegeben")
                 diagnostics_ci["applied"] = False
                 diagnostics_ci["reason"] = f"exception: {e_ci!r}"
 
@@ -1367,7 +1367,7 @@ class DashboardForecastAdapter:
         # 4b) Backtest
         # ------------------------------------------------------------------
         try:
-            LOGGER.info("[Adapter] Generiere Backtest-Daten.")
+            _logger.info("[Adapter] Generiere Backtest-Daten.")
             can_do_backtest = (
                 ModelArtifact
                 and hasattr(ModelArtifact, "exists")
@@ -1382,7 +1382,7 @@ class DashboardForecastAdapter:
                 dates_train = artifact.metadata.get("dates_train")
 
                 if X_train is None or y_train is None or dates_train is None:
-                    LOGGER.info("[Backtest] Training-Daten nicht in Artifact, extrahiere aus prepared_df")
+                    _logger.info("[Backtest] Training-Daten nicht in Artifact, extrahiere aus prepared_df")
                     try:
                         from src.forecaster.forecaster_pipeline import (  # type: ignore
                             aggregate_to_quarter,
@@ -1414,7 +1414,7 @@ class DashboardForecastAdapter:
                         else:
                             dates_train = df_feats[getattr(cfg, "date_col", "Datum")]
                     except Exception as e_bt_prep:
-                        LOGGER.warning(f"[Backtest] Vorbereitung aus prepared_df fehlgeschlagen: {e_bt_prep}")
+                        _logger.warning(f"[Backtest] Vorbereitung aus prepared_df fehlgeschlagen: {e_bt_prep}")
                         X_train = None
                         y_train = None
                         dates_train = None
@@ -1430,11 +1430,11 @@ class DashboardForecastAdapter:
                         metadata["backtest_results"] = backtest_df.to_dict(orient="records")
                         metadata["backtest_residuals"] = residuals_df.to_dict(orient="records")
                 else:
-                    LOGGER.warning("[Backtest] Trainingsdaten konnten nicht rekonstruiert werden – Backtest entfällt.")
+                    _logger.warning("[Backtest] Trainingsdaten konnten nicht rekonstruiert werden – Backtest entfällt.")
             else:
-                LOGGER.warning("[Backtest] Kein gespeichertes Modell gefunden – Backtest entfällt.")
+                _logger.warning("[Backtest] Kein gespeichertes Modell gefunden – Backtest entfällt.")
         except Exception as e_bt:
-            LOGGER.warning(f"[Backtest] Fehler bei Backtest-Erstellung: {e_bt}")
+            _logger.warning(f"[Backtest] Fehler bei Backtest-Erstellung: {e_bt}")
 
         # ------------------------------------------------------------------
         # 4c) final_dataset persistent machen für Dash – jetzt gekapselt
@@ -1468,7 +1468,7 @@ class DashboardForecastAdapter:
             if isinstance(metadata, dict):
                 metadata["dash_export"] = dash_export
         except Exception as e_persist:
-            LOGGER.warning(f"[Adapter] Konnte final_dataset nicht persistent speichern: {e_persist}")
+            _logger.warning(f"[Adapter] Konnte final_dataset nicht persistent speichern: {e_persist}")
 
         return forecast_df, metadata
 
@@ -1539,12 +1539,12 @@ class DashboardForecastAdapter:
                 if isinstance(metadata, dict):
                     metadata["dashboard_result"] = dash_result
             except Exception as _e_step6:
-                LOGGER.warning(f"[Step6] Dashboard-Payload konnte nicht gebaut werden: {_e_step6}")
+                _logger.warning(f"[Step6] Dashboard-Payload konnte nicht gebaut werden: {_e_step6}")
 
             return forecast_df, metadata
 
         except Exception as e:
-            LOGGER.exception(f"[Adapter] RUN_FORECAST fehlgeschlagen: {e}")
+            _logger.exception(f"[Adapter] RUN_FORECAST fehlgeschlagen: {e}")
             raise
         finally:
             # nur temporäre Dateien aufräumen – run-spezifische Artefakte behalten
@@ -1567,14 +1567,14 @@ class DashboardForecastAdapter:
                         if p.exists():
                             try:
                                 os.remove(p)
-                                LOGGER.info(f"[run_forecast|cleanup] temporäre Excel entfernt: {p}")
+                                _logger.info(f"[run_forecast|cleanup] temporäre Excel entfernt: {p}")
                             except Exception as _e_rm:
-                                LOGGER.warning(f"[run_forecast|cleanup] Konnte temporäre Datei nicht löschen: {_e_rm}")
+                                _logger.warning(f"[run_forecast|cleanup] Konnte temporäre Datei nicht löschen: {_e_rm}")
                     else:
                         # bewusst liegen lassen
-                        LOGGER.info(f"[run_forecast|cleanup] Excel wird behalten (run-/loader-Kontext): {p}")
+                        _logger.info(f"[run_forecast|cleanup] Excel wird behalten (run-/loader-Kontext): {p}")
             except Exception as _e_final:
-                LOGGER.warning(f"[run_forecast|cleanup] Aufräumen übersprungen: {_e_final}")
+                _logger.warning(f"[run_forecast|cleanup] Aufräumen übersprungen: {_e_final}")
 
     # ------------------------------------------------------------
     # Hilfsfunktionen
@@ -1629,7 +1629,7 @@ class DashboardForecastAdapter:
                 df_loader = df_loader.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
             return df_loader
         except Exception as _e_cache:
-            LOGGER.warning(f"[Adapter|Exog] Cache-Fallback konnte nicht geladen werden: {_e_cache}")
+            _logger.warning(f"[Adapter|Exog] Cache-Fallback konnte nicht geladen werden: {_e_cache}")
             return pd.DataFrame()
 
     @staticmethod
@@ -1665,14 +1665,14 @@ class DashboardForecastAdapter:
             elif isinstance(payload, dict):
                 obj = payload
             else:
-                LOGGER.warning(
+                _logger.warning(
                     "[Adapter] custom_final_dataset hat unerwarteten Typ: %r", type(payload)
                 )
                 return None
 
             df_json = obj.get("json")
             if not df_json:
-                LOGGER.warning(
+                _logger.warning(
                     "[Adapter] custom_final_dataset ohne 'json'-Feld – wird ignoriert."
                 )
                 return None
@@ -1680,7 +1680,7 @@ class DashboardForecastAdapter:
             df = pd.read_json(df_json, orient="split")
 
             if df.empty:
-                LOGGER.warning("[Adapter] custom_final_dataset ist leer.")
+                _logger.warning("[Adapter] custom_final_dataset ist leer.")
                 return None
 
             # Datumsspalte normalisieren
@@ -1691,7 +1691,7 @@ class DashboardForecastAdapter:
                         break
 
             if "date" not in df.columns:
-                LOGGER.warning(
+                _logger.warning(
                     "[Adapter] custom_final_dataset hat keine 'date'/'Datum' Spalte – "
                     "wird ignoriert."
                 )
@@ -1703,7 +1703,7 @@ class DashboardForecastAdapter:
             return df
 
         except Exception as e:
-            LOGGER.warning(
+            _logger.warning(
                 "[Adapter] Konnte custom_final_dataset nicht laden/parsen: %s", e
             )
             return None
@@ -1841,16 +1841,16 @@ class DashboardForecastAdapter:
         *,
         sheet_name: str = "final_dataset",
         strict: bool = True,
-        logger=LOGGER,
+        _logger=_logger,
     ) -> None:
         if not selected_exog:
-            logger.info("[Guard] Keine selected_exog übergeben – Validierung übersprungen.")
+            _logger.info("[Guard] Keine selected_exog übergeben – Validierung übersprungen.")
             return
         try:
             cols = list(pd.read_excel(excel_path, sheet_name=sheet_name, nrows=0).columns)
         except Exception as e:
             msg = f"[Guard] Konnte Excel zur Exog-Validierung nicht lesen: {excel_path} (sheet='{sheet_name}'): {e}"
-            logger.error(msg)
+            _logger.error(msg)
             raise RuntimeError(msg)
 
         cols_set = {str(c) for c in cols}
@@ -1866,19 +1866,19 @@ class DashboardForecastAdapter:
                 resolved[req] = match
 
         if missing:
-            logger.error("[Guard] Exogene Variablen fehlen im Excel-Export.")
-            logger.error(f"[Guard] Erwartet (selected_exog): {selected_exog}")
-            logger.error(f"[Guard] Gefunden (Excel-Spalten): {cols[:25]}{' ...' if len(cols)>25 else ''}")
-            logger.error(f"[Guard] Fehlend (ohne akzeptierte Varianten): {missing}")
+            _logger.error("[Guard] Exogene Variablen fehlen im Excel-Export.")
+            _logger.error(f"[Guard] Erwartet (selected_exog): {selected_exog}")
+            _logger.error(f"[Guard] Gefunden (Excel-Spalten): {cols[:25]}{' ...' if len(cols)>25 else ''}")
+            _logger.error(f"[Guard] Fehlend (ohne akzeptierte Varianten): {missing}")
             if strict:
                 raise RuntimeError(
                     f"Exogs fehlen im Excel-Export: {missing}. "
                     "Abbruch (strict=True). Bitte Exog-Mapping/Export korrigieren."
                 )
             else:
-                logger.warning("[Guard] strict=False – entferne fehlende Exogs aus cfg.selected_exog und fahre fort.")
+                _logger.warning("[Guard] strict=False – entferne fehlende Exogs aus cfg.selected_exog und fahre fort.")
         else:
-            logger.info(f"[Guard] Exog-Validierung OK. Aufgelöste Spalten: {resolved}")
+            _logger.info(f"[Guard] Exog-Validierung OK. Aufgelöste Spalten: {resolved}")
 
     @staticmethod
     def _validate_exog_presence_in_df(
@@ -1886,16 +1886,16 @@ class DashboardForecastAdapter:
         selected_exog: list[str],
         *,
         strict: bool = True,
-        logger=LOGGER,
+        _logger=_logger,
     ) -> None:
         if not selected_exog:
-            logger.info("[Guard] Keine selected_exog übergeben – Validierung übersprungen.")
+            _logger.info("[Guard] Keine selected_exog übergeben – Validierung übersprungen.")
             return
         cols_set = {str(c) for c in df_final.columns}
         variants_map = DashboardForecastAdapter._expand_exog_variants(selected_exog)
         missing = [req for req, cands in variants_map.items() if not any(c in cols_set for c in cands)]
         if missing:
-            logger.error(f"[Guard] Exogs fehlen im DataFrame vor Excel-Export: {missing}")
+            _logger.error(f"[Guard] Exogs fehlen im DataFrame vor Excel-Export: {missing}")
             if strict:
                 raise RuntimeError(
                     f"Exogs fehlen im DF/Export: {missing}. Abbruch (strict=True). "
@@ -1922,7 +1922,7 @@ class DashboardForecastAdapter:
         timeout: float = 30.0,
         poll_interval: float = 0.5,
         require_stable: bool = True,
-        logger=LOGGER,
+        _logger=_logger,
     ) -> bool:
         """
         Wartet darauf, dass der Loader eine Excel-Datei fertig geschrieben hat.
@@ -1942,7 +1942,7 @@ class DashboardForecastAdapter:
         stable_count = 0
         first_seen = None
 
-        logger.info(
+        _logger.info(
             "[Adapter|Wait] Warte auf Loader-Output: %s (prev_mtime=%.3f, timeout=%.1fs, require_stable=%s)",
             excel_path,
             previous_mtime,
@@ -1956,7 +1956,7 @@ class DashboardForecastAdapter:
             if exists:
                 if first_seen is None:
                     first_seen = time.time()
-                    logger.info(
+                    _logger.info(
                         "[Adapter|Wait] Loader-Output existiert jetzt: %s (mtime=%.3f, size=%s)",
                         excel_path,
                         mtime,
@@ -1970,7 +1970,7 @@ class DashboardForecastAdapter:
                 is_relevant_without_mtime = (previous_mtime == 0.0)
 
                 if not require_stable and (is_newer_than_before or is_relevant_without_mtime):
-                    logger.info("[Adapter|Wait] Loader-Output erkannt (%s).", excel_path)
+                    _logger.info("[Adapter|Wait] Loader-Output erkannt (%s).", excel_path)
                     return True
 
                 # require_stable = True → wir wollen mindestens 2 gleiche Größen hintereinander sehen
@@ -1987,7 +1987,7 @@ class DashboardForecastAdapter:
 
                 # wir akzeptieren Stabilität nach 2 gleichen Beobachtungen
                 if (is_newer_than_before or is_relevant_without_mtime) and stable_count >= 1:
-                    logger.info(
+                    _logger.info(
                         "[Adapter|Wait] Loader-Output stabil (%s, size=%s, mtime=%.3f).",
                         excel_path,
                         size,
@@ -1997,7 +1997,7 @@ class DashboardForecastAdapter:
 
             # Timeout prüfen
             if time.time() - start > timeout:
-                logger.warning(
+                _logger.warning(
                     "[Adapter|Wait] Timeout nach %.1fs beim Warten auf Loader-Output (%s). "
                     "Fahre mit aktuellem Stand fort.",
                     timeout,
@@ -2111,7 +2111,7 @@ class DashboardForecastAdapter:
             intervals[f"lower_{level}"] = predictions - margin
             intervals[f"upper_{level}"] = predictions + margin
 
-        LOGGER.info(f"[CI] Konfidenzintervalle berechnet: {confidence_levels}%, std_error={std_error:.4f}")
+        _logger.info(f"[CI] Konfidenzintervalle berechnet: {confidence_levels}%, std_error={std_error:.4f}")
 
         return intervals
 
@@ -2128,12 +2128,12 @@ class DashboardForecastAdapter:
         df = forecast_df.copy()
 
         if forecast_col not in df.columns:
-            LOGGER.warning(f"[CI] Spalte '{forecast_col}' nicht gefunden, verwende erste numerische Spalte")
+            _logger.warning(f"[CI] Spalte '{forecast_col}' nicht gefunden, verwende erste numerische Spalte")
             numeric_cols = df.select_dtypes(include=[np.number]).columns
             forecast_col = numeric_cols[0] if len(numeric_cols) > 0 else None
 
         if forecast_col is None:
-            LOGGER.error("[CI] Keine Forecast-Spalte gefunden!")
+            _logger.error("[CI] Keine Forecast-Spalte gefunden!")
             return df
 
         predictions = df[forecast_col].values
@@ -2147,7 +2147,7 @@ class DashboardForecastAdapter:
         for key, values in intervals.items():
             df[f"yhat_{key}"] = values
 
-        LOGGER.info(f"[CI] Hinzugefügte Spalten: {list(intervals.keys())}")
+        _logger.info(f"[CI] Hinzugefügte Spalten: {list(intervals.keys())}")
 
         return df
 
@@ -2158,7 +2158,7 @@ class DashboardForecastAdapter:
         quarter: int = 3,
         back_years: int = 4,
         factor: float = 1.0,
-        logger=LOGGER,
+        _logger=_logger,
     ) -> pd.Series:
         if tq is None or tq.empty:
             return tq
@@ -2181,7 +2181,7 @@ class DashboardForecastAdapter:
 
             threshold = seasonal_median * factor
             if cur_val < threshold:
-                logger.info(
+                _logger.info(
                     f"[Smooth] Deckel {per} (Q{quarter}): {cur_val:.2f} -> {threshold:.2f} "
                     f"(median {back_years}y Q{quarter} = {seasonal_median:.2f})"
                 )
@@ -2206,9 +2206,9 @@ class DashboardForecastAdapter:
         data_type = "fluss" if use_flows else "bestand"
         value_col = "fluss" if use_flows else "bestand"
 
-        LOGGER.info(f"[Adapter] use_flows={use_flows} -> data_type='{data_type}'")
-        LOGGER.info(f"[Adapter] requested_exog={selected_exog}")
-        LOGGER.info(
+        _logger.info(f"[Adapter] use_flows={use_flows} -> data_type='{data_type}'")
+        _logger.info(f"[Adapter] requested_exog={selected_exog}")
+        _logger.info(
             f"[Adapter] exog_data.columns (Top): "
             f"{self.exog_data.columns.tolist()[:12] if not self.exog_data.empty else []}"
         )
@@ -2259,7 +2259,7 @@ class DashboardForecastAdapter:
             tmin = float(tgt_non_null.min()) if not tgt_non_null.empty else np.nan
             tmax = float(tgt_non_null.max()) if not tgt_non_null.empty else np.nan
 
-            LOGGER.info(
+            _logger.info(
                 _sym(
                     f"[Adapter] Verwende benutzerdefiniertes PIPELINE_PREP (Upload). "
                     f"rows={len(df)}, exog_cols={exog_cols_only[:10]}{'...' if len(exog_cols_only) > 10 else ''}"
@@ -2314,7 +2314,7 @@ class DashboardForecastAdapter:
             quarter=3,
             back_years=4,
             factor=1.0,
-            logger=LOGGER,
+            _logger=_logger,
         )
 
         tq_start = tq.to_timestamp(how="start")
@@ -2336,7 +2336,7 @@ class DashboardForecastAdapter:
         resolved_exog_map: dict[str, str] = {}
         if selected_exog and not self.exog_data.empty:
             if "date" not in self.exog_data.columns:
-                LOGGER.warning(
+                _logger.warning(
                     "[Adapter] Exog-Frame hat keine 'date'-Spalte – Exogs werden übersprungen."
                 )
                 exog_monthly = pd.DataFrame({"date": monthly_index_hist})
@@ -2352,7 +2352,7 @@ class DashboardForecastAdapter:
                 ]
 
                 if missing_exogs:
-                    LOGGER.warning(
+                    _logger.warning(
                         "[Adapter] Einige gewünschte exogene Variablen wurden im "
                         "exog_data-Frame nicht gefunden (auch nicht als __last): "
                         f"{missing_exogs}"
@@ -2361,7 +2361,7 @@ class DashboardForecastAdapter:
                 if resolved_exog_map:
                     # Verwende die aufgelösten (tatsächlichen) Spaltennamen
                     available_exog = list(dict.fromkeys(resolved_exog_map.values()))
-                    LOGGER.info(
+                    _logger.info(
                         _sym(
                             f"[Adapter] Füge {len(available_exog)} exogene Variablen "
                             f"hinzu (aufgelöst): {available_exog}"
@@ -2397,7 +2397,7 @@ class DashboardForecastAdapter:
                             future_months,
                         )
 
-                    LOGGER.debug(
+                    _logger.debug(
                         f"[Adapter] Exog-Spalten nach Projection: "
                         f"{exog_monthly.columns.tolist()}"
                     )
@@ -2420,20 +2420,20 @@ class DashboardForecastAdapter:
         tmin = float(tgt_non_null.min()) if not tgt_non_null.empty else np.nan
         tmax = float(tgt_non_null.max()) if not tgt_non_null.empty else np.nan
 
-        LOGGER.info(_sym("\n[Adapter] Pipeline-Daten (MS-normalisiert + Exog-Forecast):"))
-        LOGGER.info(f"  Input-Quartale: {tq.shape[0]}")
-        LOGGER.info(
+        _logger.info(_sym("\n[Adapter] Pipeline-Daten (MS-normalisiert + Exog-Forecast):"))
+        _logger.info(f"  Input-Quartale: {tq.shape[0]}")
+        _logger.info(
             f"  Output-Monate:  {len(result)}  "
             f"(inkl. Exog-Zukunft: +{int(horizon_quarters) * 3 if horizon_quarters else 0}M)"
         )
-        LOGGER.info(f"  Target-Range:  {tmin:.3f} - {tmax:.3f}")
-        LOGGER.info(
+        _logger.info(f"  Target-Range:  {tmin:.3f} - {tmax:.3f}")
+        _logger.info(
             f"  Exog-Spalten:  {exog_cols_only[:10]}"
             f"{'...' if len(exog_cols_only) > 10 else ''}"
         )
         if result.isna().sum().sum() > 0:
             nz = result.isna().sum()
-            LOGGER.warning(f"  NaN nach Merge: {dict(nz[nz > 0])}")
+            _logger.warning(f"  NaN nach Merge: {dict(nz[nz > 0])}")
 
         if result["target_value"].isna().all():
             raise ValueError("Target-Variable enthält nur NaN-Werte.")
@@ -2482,18 +2482,18 @@ class DashboardForecastAdapter:
                         rd = Path(active["run_loader_dir"])
                         rd.mkdir(parents=True, exist_ok=True)
                         run_dir = rd
-                        LOGGER.info(
+                        _logger.info(
                             f"[create_temp_excel] benutze run-spezifischen Ordner aus active_run.json: {run_dir}"
                         )
                 except Exception as _e_active:
-                    LOGGER.warning(f"[create_temp_excel] active_run.json konnte nicht gelesen werden: {_e_active}")
+                    _logger.warning(f"[create_temp_excel] active_run.json konnte nicht gelesen werden: {_e_active}")
 
         # 2) Wenn kein lauf-spezifischer Ordner vorhanden, aber cache_tag gegeben:
         #    verwende wie bisher loader/runs/<cache_tag>/
         if run_dir is None and cache_tag:
             run_dir = base_dir / "loader" / "runs" / cache_tag
             run_dir.mkdir(parents=True, exist_ok=True)
-            LOGGER.info(f"[create_temp_excel] benutze runs-Ordner für cache_tag={cache_tag}: {run_dir}")
+            _logger.info(f"[create_temp_excel] benutze runs-Ordner für cache_tag={cache_tag}: {run_dir}")
 
         # 3) Ziel-Dateipfad bestimmen
         if run_dir is not None:
@@ -2504,7 +2504,7 @@ class DashboardForecastAdapter:
             tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
             tmp_path = tmp.name
             tmp.close()
-            LOGGER.info(f"[create_temp_excel] Fallback auf echtes Tempfile: {tmp_path}")
+            _logger.info(f"[create_temp_excel] Fallback auf echtes Tempfile: {tmp_path}")
 
         # ------------------------------------------------------------------
         # Excel-Inhalt aufbereiten
@@ -2513,25 +2513,25 @@ class DashboardForecastAdapter:
         df_export = df.rename(columns=rename_map).copy()
         df_export["Datum"] = pd.to_datetime(df_export["Datum"], errors="coerce")
 
-        LOGGER.info(_sym("\n[Adapter] Excel-Export:"))
-        LOGGER.info(f"  Ziel: {tmp_path}")
-        LOGGER.info(f"  Shape: {df_export.shape}")
-        LOGGER.info(f"  Spalten: {df_export.columns.tolist()}")
+        _logger.info(_sym("\n[Adapter] Excel-Export:"))
+        _logger.info(f"  Ziel: {tmp_path}")
+        _logger.info(f"  Shape: {df_export.shape}")
+        _logger.info(f"  Spalten: {df_export.columns.tolist()}")
 
         if not df_export.empty:
             dmin = df_export["Datum"].min()
             dmax = df_export["Datum"].max()
             tmin = df_export[excel_target_col].min()
             tmax = df_export[excel_target_col].max()
-            LOGGER.info(f"  Datum-Range: {dmin} - {dmax}")
-            LOGGER.info(f"  Target-Range ({excel_target_col}): {tmin:.1f} - {tmax:.1f}")
+            _logger.info(f"  Datum-Range: {dmin} - {dmax}")
+            _logger.info(f"  Target-Range ({excel_target_col}): {tmin:.1f} - {tmax:.1f}")
 
             exog_cols = [c for c in df_export.columns if c not in ["Datum", excel_target_col]]
             if exog_cols:
-                LOGGER.info(f"  Exogene Variablen ({len(exog_cols)}): {exog_cols}")
+                _logger.info(f"  Exogene Variablen ({len(exog_cols)}): {exog_cols}")
                 for col in exog_cols[:3]:
                     non_na = int(df_export[col].notna().sum())
-                    LOGGER.info(f"    {col}: {non_na}/{len(df_export)} Werte")
+                    _logger.info(f"    {col}: {non_na}/{len(df_export)} Werte")
 
         # schreiben
         df_export.to_excel(tmp_path, sheet_name="final_dataset", index=False)
@@ -2539,9 +2539,9 @@ class DashboardForecastAdapter:
         # kurze Validierung
         try:
             v = pd.read_excel(tmp_path, sheet_name="final_dataset")
-            LOGGER.info(f"[Adapter] Excel-Validierung: {len(v)} Zeilen, Spalten: {list(v.columns)}")
+            _logger.info(f"[Adapter] Excel-Validierung: {len(v)} Zeilen, Spalten: {list(v.columns)}")
         except Exception as e:
-            LOGGER.warning(f"[Adapter] Excel-Validierung fehlgeschlagen: {e}")
+            _logger.warning(f"[Adapter] Excel-Validierung fehlgeschlagen: {e}")
 
         return tmp_path, excel_target_col
 
@@ -2575,7 +2575,7 @@ class DashboardForecastAdapter:
                 cols = list(pd.read_excel(excel_path, sheet_name="final_dataset", nrows=0).columns)
             except Exception:
                 cols = ["Datum", "PH_EINLAGEN"]
-                LOGGER.warning(
+                _logger.warning(
                     "[Adapter|Config] Konnte Excel nicht lesen (%s) – verwende Fallback-Spalten.",
                     excel_path,
                 )
@@ -2585,7 +2585,7 @@ class DashboardForecastAdapter:
             ui_norm = str(ui_target).strip().lower()
             excel_norm = str(excel_target_effective).strip().lower()
             if ui_norm != excel_norm:
-                LOGGER.warning(
+                _logger.warning(
                     "[Adapter|Config|MISMATCH] UI-Target='%s' ≠ Excel-Target='%s'. "
                     "Es wird das Excel-Target verwendet.",
                     ui_target,
@@ -2699,7 +2699,7 @@ class DashboardForecastAdapter:
                 ignored_keys.append(k)
 
         if ignored_keys:
-            LOGGER.warning(
+            _logger.warning(
                 "[Adapter|Config] Ignoriere unbekannte Config-Parameter (nicht im PipelineConfig vorhanden): "
                 + ", ".join(sorted(map(str, ignored_keys)))
             )
@@ -2717,13 +2717,13 @@ class DashboardForecastAdapter:
                 pass
 
         try:
-            LOGGER.info(f"[Adapter] Config.target_col (aus Excel/Caller): {excel_target_effective}")
+            _logger.info(f"[Adapter] Config.target_col (aus Excel/Caller): {excel_target_effective}")
             if ui_target:
-                LOGGER.info(f"[Adapter] UI-target (nur Info): {ui_target}")
-            LOGGER.info(f"[Adapter] Config.selected_exog: {getattr(cfg, 'selected_exog', None)}")
+                _logger.info(f"[Adapter] UI-target (nur Info): {ui_target}")
+            _logger.info(f"[Adapter] Config.selected_exog: {getattr(cfg, 'selected_exog', None)}")
             if hasattr(cfg, "exog_cols"):
-                LOGGER.info(f"[Adapter] Config.exog_cols: {getattr(cfg, 'exog_cols', None)}")
-            LOGGER.info(
+                _logger.info(f"[Adapter] Config.exog_cols: {getattr(cfg, 'exog_cols', None)}")
+            _logger.info(
                 f"[Adapter] cache_tag={getattr(cfg, 'cache_tag', None)}, "
                 f"horizon={getattr(cfg, 'forecast_horizon', None)}, "
                 f"ui_mode={ui_mode}, sektor={sektor}"
@@ -2748,7 +2748,7 @@ class DashboardForecastAdapter:
             try:
                 return ModelArtifact.load(path)
             except Exception as e:
-                LOGGER.warning(f"[CI] Artifact konnte nicht geladen werden: {e}")
+                _logger.warning(f"[CI] Artifact konnte nicht geladen werden: {e}")
                 return None
 
         def _finite_diff_derivative(inv_func, z0: float, eps: float = 1e-3) -> float:
@@ -2763,7 +2763,7 @@ class DashboardForecastAdapter:
             res = np.array(metadata["cv_residuals"], dtype=float)
             res = res[np.isfinite(res)]
             if res.size > 0:
-                LOGGER.info(f"[CI] Residuen aus Metadata geladen: {res.size} Werte")
+                _logger.info(f"[CI] Residuen aus Metadata geladen: {res.size} Werte")
                 return res
 
         art = _load_artifact(model_path) if model_path else None
@@ -2773,7 +2773,7 @@ class DashboardForecastAdapter:
                 res = np.array(md["cv_residuals"], dtype=float)
                 res = res[np.isfinite(res)]
                 if res.size > 0:
-                    LOGGER.info(f"[CI] Residuen aus Modell geladen: {res.size} Werte")
+                    _logger.info(f"[CI] Residuen aus Modell geladen: {res.size} Werte")
                     return res
 
         if metadata and isinstance(metadata.get("cv_performance"), dict):
@@ -2785,7 +2785,7 @@ class DashboardForecastAdapter:
 
                 if scale_flag == "original":
                     residuals = np.random.normal(0.0, rmse, size=int(n_synth))
-                    LOGGER.info(f"[CI] Synthetische Residuen (original scale) mit RMSE={rmse:.4f}, n={n_synth}")
+                    _logger.info(f"[CI] Synthetische Residuen (original scale) mit RMSE={rmse:.4f}, n={n_synth}")
                     return residuals
 
                 tj = getattr(art, "tj", None) if art else None
@@ -2814,12 +2814,12 @@ class DashboardForecastAdapter:
                         if np.isfinite(d_dz) and d_dz > 0:
                             rmse_back = rmse * d_dz
                             residuals = np.random.normal(0.0, rmse_back, size=int(n_synth))
-                            LOGGER.warning(
+                            _logger.warning(
                                 f"[CI] RMSE rückskaliert via lokale Ableitung: rmse_t={rmse:.4f} → rmse_y={rmse_back:.4f} (y0={y0:.4f})"
                             )
                             return residuals
                     except Exception as e:
-                        LOGGER.warning(f"[CI] Rückskalierung (Ableitung) fehlgeschlagen: {e}")
+                        _logger.warning(f"[CI] Rückskalierung (Ableitung) fehlgeschlagen: {e}")
 
                     try:
                         z0 = float(tj.transform(np.array([[y0]])).ravel()[0])
@@ -2828,20 +2828,20 @@ class DashboardForecastAdapter:
                         residuals = (y_sim - y0).astype(float)
                         residuals = residuals[np.isfinite(residuals)]
                         if residuals.size > 0:
-                            LOGGER.warning(
+                            _logger.warning(
                                 f"[CI] RMSE rückskaliert via Monte-Carlo: rmse_t={rmse:.4f} → std_y≈{np.std(residuals):.4f} (y0={y0:.4f})"
                             )
                             return residuals
                     except Exception as e:
-                        LOGGER.warning(f"[CI] Rückskalierung (Monte-Carlo) fehlgeschlagen: {e}")
+                        _logger.warning(f"[CI] Rückskalierung (Monte-Carlo) fehlgeschlagen: {e}")
 
-                LOGGER.warning(
+                _logger.warning(
                     "[CI] cv_rmse ist 'transformed', aber kein Transformer verfügbar – "
                     "nutze konservativen Default (keine Rückskalierung möglich)."
                 )
                 return np.random.normal(0.0, rmse, size=int(n_synth))
 
-        LOGGER.error("[CI] Keine Residuen verfügbar – verwende Default-Annahme (std=0.1)")
+        _logger.error("[CI] Keine Residuen verfügbar – verwende Default-Annahme (std=0.1)")
         return np.random.normal(0.0, 0.1, size=int(n_synth))
 
     def _generate_backtest_results(
@@ -3050,7 +3050,7 @@ class DashboardForecastAdapter:
         d_ser = _to_series(dates_train)
 
         if X_df is None or y_ser is None or d_ser is None:
-            LOGGER.warning("[Backtest] Trainingsdaten unvollständig – gebe leere Frames zurück")
+            _logger.warning("[Backtest] Trainingsdaten unvollständig – gebe leere Frames zurück")
             return pd.DataFrame(), pd.DataFrame()
 
         backtest_df, residuals_df = self._generate_backtest_results(
@@ -3061,7 +3061,7 @@ class DashboardForecastAdapter:
             dates_train=d_ser,
             n_splits=n_splits,
         )
-        LOGGER.info(f"[Backtest] {len(backtest_df)} Punkte erzeugt")
+        _logger.info(f"[Backtest] {len(backtest_df)} Punkte erzeugt")
         return backtest_df, residuals_df
 
     # ------------------------------------------------------------
@@ -3172,7 +3172,7 @@ class DashboardForecastAdapter:
             # Direkter Treffer: gleicher Normalname
             if norm_req in col_map:
                 mapping[raw_name] = col_map[norm_req]
-                LOGGER.debug(f"[ExogResolve] '{raw_name}' -> '{col_map[norm_req]}' (norm: '{norm_req}')")
+                _logger.debug(f"[ExogResolve] '{raw_name}' -> '{col_map[norm_req]}' (norm: '{norm_req}')")
                 continue
             
             # Fallback: Suche nach Spalten, die mit dem normalisierten Namen beginnen
@@ -3180,14 +3180,14 @@ class DashboardForecastAdapter:
             for col_norm, actual_col in col_map.items():
                 if col_norm.startswith(norm_req):
                     mapping[raw_name] = actual_col
-                    LOGGER.debug(f"[ExogResolve] '{raw_name}' -> '{actual_col}' (prefix-match: '{norm_req}')")
+                    _logger.debug(f"[ExogResolve] '{raw_name}' -> '{actual_col}' (prefix-match: '{norm_req}')")
                     break
 
         # Logging für nicht gefundene Exogs
         missing = [req for req in requested_exogs if req not in mapping]
         if missing:
-            LOGGER.debug(f"[ExogResolve] Nicht gefunden: {missing}")
-            LOGGER.debug(f"[ExogResolve] Verfügbare Spalten (normalisiert): {sorted(col_map.keys())[:10]}...")
+            _logger.debug(f"[ExogResolve] Nicht gefunden: {missing}")
+            _logger.debug(f"[ExogResolve] Verfügbare Spalten (normalisiert): {sorted(col_map.keys())[:10]}...")
 
         return mapping
 
@@ -3203,7 +3203,7 @@ class DashboardForecastAdapter:
 
         runs_dir = base_dir / "loader" / "runs" / cache_tag
         if not runs_dir.exists():
-            LOGGER.info("[Adapter|Reuse] Kein runs-Ordner für cache_tag=%s gefunden.", cache_tag)
+            _logger.info("[Adapter|Reuse] Kein runs-Ordner für cache_tag=%s gefunden.", cache_tag)
             return None
 
         candidates = sorted(
@@ -3212,14 +3212,14 @@ class DashboardForecastAdapter:
             reverse=True,
         )
         if not candidates:
-            LOGGER.info("[Adapter|Reuse] Keine *_final_dataset.xlsx unter %s", runs_dir)
+            _logger.info("[Adapter|Reuse] Keine *_final_dataset.xlsx unter %s", runs_dir)
             return None
 
         for xlsx in candidates:
             try:
                 df_head = pd.read_excel(xlsx, sheet_name="final_dataset", nrows=0)
             except Exception as exc:
-                LOGGER.warning("[Adapter|Reuse] Konnte %s nicht lesen: %s", xlsx, exc)
+                _logger.warning("[Adapter|Reuse] Konnte %s nicht lesen: %s", xlsx, exc)
                 continue
 
             cols = {str(c) for c in df_head.columns}
@@ -3236,20 +3236,20 @@ class DashboardForecastAdapter:
             if not all_ok:
                 continue
 
-            LOGGER.info("[Adapter|Reuse] Verwende früheren Run: %s", xlsx)
+            _logger.info("[Adapter|Reuse] Verwende früheren Run: %s", xlsx)
 
             try:
                 fin_dir = base_dir / "loader" / "financial_cache"
                 fin_dir.mkdir(parents=True, exist_ok=True)
                 fin_out = fin_dir / "output.xlsx"
                 shutil.copy2(xlsx, fin_out)
-                LOGGER.info("[Adapter|Reuse] Nach financial_cache gespiegelt: %s", fin_out)
+                _logger.info("[Adapter|Reuse] Nach financial_cache gespiegelt: %s", fin_out)
             except Exception as exc:
-                LOGGER.warning("[Adapter|Reuse] Konnte Datei nicht in financial_cache spiegeln: %s", exc)
+                _logger.warning("[Adapter|Reuse] Konnte Datei nicht in financial_cache spiegeln: %s", exc)
 
             return str(xlsx)
 
-        LOGGER.info("[Adapter|Reuse] Kein passender früherer Run gefunden.")
+        _logger.info("[Adapter|Reuse] Kein passender früherer Run gefunden.")
         return None
 
     # ------------------------------------------------------------
@@ -3287,25 +3287,25 @@ class DashboardForecastAdapter:
         try:
             if kind == "snapshot_parquet":
                 if df is None:
-                    LOGGER.warning("[Writer] snapshot_parquet ohne DataFrame aufgerufen – übersprungen.")
+                    _logger.warning("[Writer] snapshot_parquet ohne DataFrame aufgerufen – übersprungen.")
                     return None
                 df.to_parquet(target_path)
-                LOGGER.info(f"[Writer] Snapshot geschrieben: {target_path}")
+                _logger.info(f"[Writer] Snapshot geschrieben: {target_path}")
                 return str(target_path)
 
             elif kind == "dash_final_dataset":
                 if not src_path or not os.path.exists(src_path):
-                    LOGGER.warning(f"[Writer] dash_final_dataset: Quelle existiert nicht ({src_path}) – übersprungen.")
+                    _logger.warning(f"[Writer] dash_final_dataset: Quelle existiert nicht ({src_path}) – übersprungen.")
                     return None
                 shutil.copy2(src_path, target_path)
-                LOGGER.info(f"[Writer] Dash-Excel persistiert: {target_path}")
+                _logger.info(f"[Writer] Dash-Excel persistiert: {target_path}")
                 return str(target_path)
 
             else:
-                LOGGER.warning(f"[Writer] Unbekannter kind='{kind}' – nichts geschrieben.")
+                _logger.warning(f"[Writer] Unbekannter kind='{kind}' – nichts geschrieben.")
                 return None
         except Exception as e:
-            LOGGER.warning(f"[Writer] Schreiben fehlgeschlagen ({kind}): {e}")
+            _logger.warning(f"[Writer] Schreiben fehlgeschlagen ({kind}): {e}")
             return None
 
     # ------------------------------------------------------------
@@ -3319,10 +3319,10 @@ class DashboardForecastAdapter:
         - Pipeline-/Adapter-Infos
         - Verknüpfung zu Artefakten aus Schritt 4
         """
-        LOGGER.info(_sym("[Adapter] ===== STEP 6: Dashboard-Payload bauen ====="))
+        _logger.info(_sym("[Adapter] ===== STEP 6: Dashboard-Payload bauen ====="))
 
         if forecast_df is None or forecast_df.empty:
-            LOGGER.warning("[Step6] Forecast-DataFrame ist leer – Dashboard-Payload wird minimal.")
+            _logger.warning("[Step6] Forecast-DataFrame ist leer – Dashboard-Payload wird minimal.")
             forecast_records = []
             columns = []
         else:
@@ -3349,7 +3349,7 @@ class DashboardForecastAdapter:
             "model_path": model_path,
         }
 
-        LOGGER.info(
+        _logger.info(
             f"[Step6] Dashboard-Payload: rows={forecast_summary['n_rows']}, "
             f"cols={forecast_summary['n_columns']}, has_intervals={forecast_summary['has_intervals']}"
         )
@@ -3380,7 +3380,7 @@ class DashboardForecastAdapter:
 
             coverage[level] = float(coverage_pct)
 
-            LOGGER.info(f"[CI Coverage] {level}% CI → tatsächliche Coverage: {coverage_pct:.1f}%")
+            _logger.info(f"[CI Coverage] {level}% CI → tatsächliche Coverage: {coverage_pct:.1f}%")
 
         return coverage
 

@@ -1,6 +1,6 @@
 from backend.forecaster.core.config import Config
 from backend.forecaster.core.model.model import ModelArtifact
-from backend.forecaster.forecaster_pipeline import LOGGER
+from backend.forecaster.forecaster_pipeline import _logger
 
 
 import pandas as pd
@@ -27,11 +27,11 @@ def compare_model_performance(model_paths: List[str]):
                 }
             )
         except Exception as e:
-            LOGGER.warning(f"Fehler bei {path}: {e}")
+            _logger.warning(f"Fehler bei {path}: {e}")
 
     if results:
         df = pd.DataFrame(results)
-        LOGGER.info("\nModell-Vergleich:\n" + df.to_string(index=False))
+        _logger.info("\nModell-Vergleich:\n" + df.to_string(index=False))
         return df
     return None
 
@@ -61,14 +61,14 @@ def delete_model(cfg: Config):
     model_path = get_model_filepath(cfg)
     if os.path.exists(model_path):
         os.remove(model_path)
-        LOGGER.info(f"✓ Modell gelöscht: {model_path}")
+        _logger.info(f"✓ Modell gelöscht: {model_path}")
     else:
-        LOGGER.info(f"Kein Modell gefunden: {model_path}")
+        _logger.info(f"Kein Modell gefunden: {model_path}")
 
 
 def list_saved_models(model_dir: str = "models"):
     if not os.path.exists(model_dir):
-        LOGGER.info(f"Kein Modell-Verzeichnis gefunden: {model_dir}")
+        _logger.info(f"Kein Modell-Verzeichnis gefunden: {model_dir}")
         return []
 
     models = []
@@ -88,11 +88,11 @@ def list_saved_models(model_dir: str = "models"):
                     }
                 )
             except Exception as e:
-                LOGGER.warning(f"Warnung: Konnte {f} nicht laden: {e}")
+                _logger.warning(f"Warnung: Konnte {f} nicht laden: {e}")
 
     if models:
         df = pd.DataFrame(models)
-        LOGGER.info("\nGespeicherte Modelle:\n" + df.to_string(index=False))
+        _logger.info("\nGespeicherte Modelle:\n" + df.to_string(index=False))
     else:
-        LOGGER.info("Keine gespeicherten Modelle gefunden.")
+        _logger.info("Keine gespeicherten Modelle gefunden.")
     return models

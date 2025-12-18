@@ -185,19 +185,19 @@ HCPRESET_CACHE_FILE = PRESETS_DIR / "hc_presets_cache.json"
 # ==============================================================================
 
 try:
-    from app import logger as APP_LOGGER
+    from app import _logger as APP_LOGGER
 except Exception:
     APP_LOGGER = None
 
-logger = APP_LOGGER or logging.getLogger("GVB_Dashboard")
-if not logger.handlers:
+_logger = APP_LOGGER or logging.getLogger("GVB_Dashboard")
+if not _logger.handlers:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(
         logging.Formatter("%(asctime)s | %(levelname)-7s | GVB_Dashboard | %(message)s")
     )
-    logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-logger.propagate = False
+    _logger.addHandler(handler)
+_logger.setLevel(logging.INFO)
+_logger.propagate = False
 
 # Log-Adapter
 try:
@@ -206,15 +206,15 @@ try:
 except Exception:
     class Log:
         @staticmethod
-        def scenario_table(msg: str): logger.info(msg)
+        def scenario_table(msg: str): _logger.info(msg)
         @staticmethod
-        def info(msg: str): logger.info(msg)
+        def info(msg: str): _logger.info(msg)
         @staticmethod
-        def warning(msg: str): logger.warning(msg)
+        def warning(msg: str): _logger.warning(msg)
         @staticmethod
-        def error(msg: str): logger.error(msg)
+        def error(msg: str): _logger.error(msg)
         @staticmethod
-        def exception(msg: str): logger.exception(msg)
+        def exception(msg: str): _logger.exception(msg)
 
 # ==============================================================================
 # CALLBACK PROXY
@@ -256,10 +256,10 @@ def _filter_gvb_json_by_sektor(gvb_json: str, sektor_value: str) -> str:
         if isinstance(df, pd.DataFrame) and not df.empty and "sektor" in df.columns and sektor_value:
             sekt = str(sektor_value).strip().upper()
             df = df[df["sektor"].astype(str).str.upper() == sekt].copy()
-            logger.debug(f"GVB-Daten nach Sektor '{sekt}' gefiltert: {len(df)} Zeilen")
+            _logger.debug(f"GVB-Daten nach Sektor '{sekt}' gefiltert: {len(df)} Zeilen")
         return df.to_json(orient="split", date_format="iso")
     except Exception as e:
-        logger.warning(f"Sektorfilterung fehlgeschlagen: {e}, verwende ungefilterte Daten")
+        _logger.warning(f"Sektorfilterung fehlgeschlagen: {e}, verwende ungefilterte Daten")
         return gvb_json
 
 
@@ -283,7 +283,7 @@ def _parse_store_df(payload) -> pd.DataFrame:
         try:
             obj = json.loads(payload)
         except Exception:
-            logger.debug("Store-Payload konnte nicht als JSON geparst werden")
+            _logger.debug("Store-Payload konnte nicht als JSON geparst werden")
             return pd.DataFrame()
     else:
         obj = payload
@@ -311,7 +311,7 @@ def _parse_store_df(payload) -> pd.DataFrame:
         except Exception:
             pass
 
-    logger.debug("Store-Payload konnte nicht in DataFrame konvertiert werden")
+    _logger.debug("Store-Payload konnte nicht in DataFrame konvertiert werden")
     return pd.DataFrame()
 
 
@@ -577,7 +577,7 @@ def _load_ecb_options() -> List[Dict]:
     """Lädt ECB-Indikatoren-Optionen mit Serien-ID."""
     db_path = _find_ecb_db()
     if not db_path:
-        logger.info("[ECB] Keine ecb_database.xlsx gefunden")
+        _logger.info("[ECB] Keine ecb_database.xlsx gefunden")
         return []
 
     try:
@@ -600,7 +600,7 @@ def _load_ecb_options() -> List[Dict]:
         )
 
         if not code_col:
-            logger.info(f"[ECB] Code-Spalte nicht gefunden. Verfügbar: {df.columns.tolist()}")
+            _logger.info(f"[ECB] Code-Spalte nicht gefunden. Verfügbar: {df.columns.tolist()}")
             return []
 
         # Qualitäts-Filter
@@ -609,7 +609,7 @@ def _load_ecb_options() -> List[Dict]:
             qc = df[qc_col].astype(str).str.lower()
             if qc.str.contains("sehr|good|ok|passed").any():
                 df = df[qc.str.contains("sehr|good|ok|passed", na=False)]
-        logger.info(f"[ECB] Qualität-Filter: {before_q} -> {len(df)} Zeilen")
+        _logger.info(f"[ECB] Qualität-Filter: {before_q} -> {len(df)} Zeilen")
 
         # Optionen erstellen
         options = []
@@ -632,11 +632,11 @@ def _load_ecb_options() -> List[Dict]:
             label_component = html.Span(short_label, title=full_label)
             options.append({"label": label_component, "value": code})
 
-        logger.info(f"[ECB] {len(options)} Indikatoren geladen")
+        _logger.info(f"[ECB] {len(options)} Indikatoren geladen")
         return options
 
     except Exception as e:
-        logger.exception(f"[ECB] Fehler beim Laden: {e}")
+        _logger.exception(f"[ECB] Fehler beim Laden: {e}")
         return []
 
 
@@ -690,7 +690,7 @@ def _load_ecb_series_names() -> Dict[str, str]:
     try:
         db_path = _find_ecb_db()
         if not db_path or not db_path.exists():
-            logger.info("[Namen-Mapping] ecb_database.xlsx nicht gefunden")
+            _logger.info("[Namen-Mapping] ecb_database.xlsx nicht gefunden")
             return {}
         
         df = pd.read_excel(db_path)
@@ -709,7 +709,7 @@ def _load_ecb_series_names() -> Dict[str, str]:
                 name_col = col
         
         if not code_col or not name_col:
-            logger.info(f"[Namen-Mapping] Spalten nicht gefunden. Verfügbar: {list(df.columns)}")
+            _logger.info(f"[Namen-Mapping] Spalten nicht gefunden. Verfügbar: {list(df.columns)}")
             return {}
         
         name_map = {}
@@ -719,11 +719,11 @@ def _load_ecb_series_names() -> Dict[str, str]:
             if code and name and code != 'nan' and name != 'nan' and '.' in code:
                 name_map[code] = name
         
-        logger.info(f"[Namen-Mapping] {len(name_map)} Serien-Namen geladen")
+        _logger.info(f"[Namen-Mapping] {len(name_map)} Serien-Namen geladen")
         return name_map
         
     except Exception as e:
-        logger.error(f"[Namen-Mapping] Fehler beim Laden: {e}")
+        _logger.error(f"[Namen-Mapping] Fehler beim Laden: {e}")
         return {}
     
 
@@ -749,7 +749,7 @@ def _save_hc_preset_cache(cache: dict) -> None:
             encoding="utf-8"
         )
     except Exception as e:
-        logger.error(f"[HC-Presets] Write error: {e}")
+        _logger.error(f"[HC-Presets] Write error: {e}")
 
 
 def _normalize_target_slug(target_value: Optional[str]) -> str:
@@ -845,7 +845,7 @@ def _hydrate_hc_presets_with_cache(base: dict) -> dict:
         if cached.get("model_path"):
             m["model_path"] = cached["model_path"]
         
-        logger.debug(
+        _logger.debug(
             f"[HC-Presets] hydrate slug={slug} → target={m.get('target')} | "
             f"model={m.get('model_path')} | final={m.get('final_dataset_path')}"
         )
@@ -1141,13 +1141,13 @@ def _safe_read_debug_csv(path: Any, *, add_cols: Optional[dict] = None) -> pd.Da
         return pd.DataFrame()
 
     if not p.exists() or not p.is_file():
-        logger.info(f"[Export/Debug] Debug-Datei nicht gefunden: {p}")
+        _logger.info(f"[Export/Debug] Debug-Datei nicht gefunden: {p}")
         df = pd.DataFrame()
     else:
         try:
             df = pd.read_csv(p)
         except Exception as e:
-            logger.warning(f"[Export/Debug] Konnte Debug-Datei nicht lesen ({p}): {e}")
+            _logger.warning(f"[Export/Debug] Konnte Debug-Datei nicht lesen ({p}): {e}")
             df = pd.DataFrame()
 
     if add_cols:
@@ -1260,7 +1260,7 @@ def _add_backtest_to_chart(
         missing_cols = [col for col in required_cols if col not in backtest_results.columns]
         
         if missing_cols:
-            logger.warning(f"[Backtest-Overlay] Fehlende Spalten: {missing_cols}")
+            _logger.warning(f"[Backtest-Overlay] Fehlende Spalten: {missing_cols}")
             return fig
         
         bt = backtest_results.copy()
@@ -1270,7 +1270,7 @@ def _add_backtest_to_chart(
         bt = bt.dropna(subset=['date', 'predicted'])
         
         if bt.empty:
-            logger.warning("[Backtest-Overlay] Keine gültigen Daten nach Bereinigung")
+            _logger.warning("[Backtest-Overlay] Keine gültigen Daten nach Bereinigung")
             return fig
         
         fig.add_trace(go.Scatter(
@@ -1287,9 +1287,9 @@ def _add_backtest_to_chart(
             visible=True
         ))
         
-        logger.info(f"[Backtest-Overlay] ✓ {len(bt)} historische Vorhersagen hinzugefügt")
+        _logger.info(f"[Backtest-Overlay] ✓ {len(bt)} historische Vorhersagen hinzugefügt")
     except Exception as e:
-        logger.warning(f"[Backtest-Overlay] Konnte Overlay nicht hinzufügen: {e}")
+        _logger.warning(f"[Backtest-Overlay] Konnte Overlay nicht hinzufügen: {e}")
     
     return fig
 
@@ -1306,7 +1306,7 @@ def _add_backtest_error_band(
         missing_cols = [col for col in required_cols if col not in backtest_results.columns]
         
         if missing_cols:
-            logger.warning(f"[Backtest-ErrorBand] Fehlende Spalten: {missing_cols}")
+            _logger.warning(f"[Backtest-ErrorBand] Fehlende Spalten: {missing_cols}")
             return fig
         
         df = backtest_results.copy()
@@ -1315,7 +1315,7 @@ def _add_backtest_error_band(
         
         df = df.dropna(subset=['date', 'actual', 'predicted'])
         if df.empty:
-            logger.warning("[Backtest-ErrorBand] Keine gültigen Daten")
+            _logger.warning("[Backtest-ErrorBand] Keine gültigen Daten")
             return fig
         
         df['error'] = df['actual'] - df['predicted']
@@ -1354,9 +1354,9 @@ def _add_backtest_error_band(
                 showlegend=True
             ))
         
-        logger.info("[Backtest-ErrorBand] ✓ Fehler-Bänder hinzugefügt")
+        _logger.info("[Backtest-ErrorBand] ✓ Fehler-Bänder hinzugefügt")
     except Exception as e:
-        logger.warning(f"[Backtest-ErrorBand] Konnte Fehler-Bänder nicht hinzufügen: {e}")
+        _logger.warning(f"[Backtest-ErrorBand] Konnte Fehler-Bänder nicht hinzufügen: {e}")
     
     return fig
 
@@ -1373,7 +1373,7 @@ def _add_backtest_markers(
         required_cols = ['date', 'actual', 'predicted']
         missing_cols = [col for col in required_cols if col not in backtest_results.columns]
         if missing_cols:
-            logger.warning(f"[Backtest-Markers] Fehlende Spalten: {missing_cols}")
+            _logger.warning(f"[Backtest-Markers] Fehlende Spalten: {missing_cols}")
             return fig
         
         df = backtest_results.copy()
@@ -1382,7 +1382,7 @@ def _add_backtest_markers(
         
         df = df.dropna(subset=['date', 'actual', 'predicted'])
         if df.empty:
-            logger.warning("[Backtest-Markers] Keine gültigen Daten")
+            _logger.warning("[Backtest-Markers] Keine gültigen Daten")
             return fig
         
         df['error'] = abs(df['actual'] - df['predicted'])
@@ -1407,9 +1407,9 @@ def _add_backtest_markers(
                 hovertemplate='<b>Datum</b>: %{x}<br><b>Tatsächlich</b>: %{y:.2f}<br><b>Fehler</b>: %{customdata:.2f}<extra></extra>',
                 customdata=large_errors['error']
             ))
-            logger.debug(f"[Backtest-Markers] {len(large_errors)} große Fehler markiert")
+            _logger.debug(f"[Backtest-Markers] {len(large_errors)} große Fehler markiert")
     except Exception as e:
-        logger.warning(f"[Backtest-Markers] Konnte Marker nicht hinzufügen: {e}")
+        _logger.warning(f"[Backtest-Markers] Konnte Marker nicht hinzufügen: {e}")
     
     return fig
 
@@ -1808,7 +1808,7 @@ def _create_pipeline_chart(
                 expected_end + pd.Timedelta(days=buffer_days)
             ]
         except Exception as e:
-            logger.warning(f"[Chart] Konnte X-Achsen-Bereich nicht berechnen: {e}")
+            _logger.warning(f"[Chart] Konnte X-Achsen-Bereich nicht berechnen: {e}")
             x_range = None
 
     fig = go.Figure()
@@ -1880,7 +1880,7 @@ def _create_pipeline_chart(
             try:
                 backtest_data = pd.DataFrame(backtest_data)
             except Exception as e:
-                logger.warning(f"[Chart] Konnte Backtest-Daten nicht in DataFrame konvertieren: {e}")
+                _logger.warning(f"[Chart] Konnte Backtest-Daten nicht in DataFrame konvertieren: {e}")
                 backtest_data = None
         
         if isinstance(backtest_data, pd.DataFrame) and not backtest_data.empty:
@@ -1888,7 +1888,7 @@ def _create_pipeline_chart(
             if 'date' in bt.columns:
                 bt['date'] = pd.to_datetime(bt['date'], errors='coerce')
             else:
-                logger.info("[Chart] Backtest ohne 'date' Spalte – überspringe Overlay")
+                _logger.info("[Chart] Backtest ohne 'date' Spalte – überspringe Overlay")
                 bt = pd.DataFrame()
 
             if 'predicted' in bt.columns:
@@ -1968,7 +1968,7 @@ def _create_pipeline_chart(
                 name=''
             ))
     except Exception as e:
-        logger.warning(f"[Chart] Konnte Y-Achse/Cutoff nicht finalisieren: {e}")
+        _logger.warning(f"[Chart] Konnte Y-Achse/Cutoff nicht finalisieren: {e}")
 
     try:
         # X-Achsen-Formatierung (Quartale)
@@ -2239,7 +2239,7 @@ def clear_runs_directory() -> int:
     Gibt die Anzahl der gelöschten Einträge zurück.
     """
     if not RUNS_DIR.exists():
-        logger.info(f"[Cache-Clear] RUNS_DIR existiert nicht: {RUNS_DIR}")
+        _logger.info(f"[Cache-Clear] RUNS_DIR existiert nicht: {RUNS_DIR}")
         return 0
 
     deleted = 0
@@ -2251,9 +2251,9 @@ def clear_runs_directory() -> int:
                 item.unlink()
             deleted += 1
         except Exception as exc:
-            logger.warning(f"[Cache-Clear] Konnte {item} nicht löschen: {exc}")
+            _logger.warning(f"[Cache-Clear] Konnte {item} nicht löschen: {exc}")
 
-    logger.info(f"[Cache-Clear] {deleted} Eintrag(e) aus {RUNS_DIR} entfernt.")
+    _logger.info(f"[Cache-Clear] {deleted} Eintrag(e) aus {RUNS_DIR} entfernt.")
     return deleted
 
 
@@ -2300,7 +2300,7 @@ def _load_run_meta(run_ts_dir: Path) -> dict:
         with meta_files[0].open("r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as exc:
-        logger.warning(f"[Runs-List] Konnte Meta aus {run_ts_dir} nicht laden: {exc}")
+        _logger.warning(f"[Runs-List] Konnte Meta aus {run_ts_dir} nicht laden: {exc}")
         return {}
 
 
@@ -2313,7 +2313,7 @@ def _discover_runs() -> list[dict]:
     runs: list[dict] = []
 
     if not RUNS_DIR.exists():
-        logger.info(f"[Runs-List] RUNS_DIR existiert nicht: {RUNS_DIR}")
+        _logger.info(f"[Runs-List] RUNS_DIR existiert nicht: {RUNS_DIR}")
         return runs
 
     for tag_dir in sorted(RUNS_DIR.iterdir()):
@@ -2541,7 +2541,7 @@ def handle_runs_modal(open_click, close_click, load_clicks, is_open):
             "path": str(run_dir),
             "meta": meta,
         }
-        logger.info(f"[Runs-List] Run gewählt: {picked.get('cache_tag')}")
+        _logger.info(f"[Runs-List] Run gewählt: {picked.get('cache_tag')}")
 
         # Modal schließen, Body nicht anrühren, Store füllen
         return False, no_update, picked
@@ -2577,7 +2577,7 @@ def populate_preset_dropdown_options(
         try:
             from src.frontend.forecaster.forecaster_main import get_ecb_presets_hydrated
         except ImportError:
-            logger.warning("[PresetDropdown] get_ecb_presets_hydrated nicht verfügbar")
+            _logger.warning("[PresetDropdown] get_ecb_presets_hydrated nicht verfügbar")
             def get_ecb_presets_hydrated():
                 return {}
         
@@ -2590,10 +2590,10 @@ def populate_preset_dropdown_options(
                 title = meta.get("title") or f"H&C {target_slug}"
                 hc_dict[title] = {"id": target_slug}
         except Exception as e:
-            logger.warning(f"[PresetDropdown] H&C-Presets nicht verfügbar: {e}")
+            _logger.warning(f"[PresetDropdown] H&C-Presets nicht verfügbar: {e}")
         
         user_dict_disk = _load_user_presets_from_disk()
-        logger.debug(f"[PresetDropdown] {len(user_dict_disk)} User-Presets von Disk geladen")
+        _logger.debug(f"[PresetDropdown] {len(user_dict_disk)} User-Presets von Disk geladen")
         
         options = merge_hc_and_user_presets_for_dropdown(
             hc_presets=hc_dict,
@@ -2604,11 +2604,11 @@ def populate_preset_dropdown_options(
         
         options.insert(0, {"label": "– kein Preset –", "value": "__none__"})
         
-        logger.debug(f"[PresetDropdown] {len(options)} Optionen generiert")
+        _logger.debug(f"[PresetDropdown] {len(options)} Optionen generiert")
         return options, user_dict_disk
     
     except Exception as e:
-        logger.exception(f"[PresetDropdown] Kritischer Fehler: {e}")
+        _logger.exception(f"[PresetDropdown] Kritischer Fehler: {e}")
         return [{"label": "– kein Preset –", "value": "__none__"}], no_update
 
 
@@ -2633,7 +2633,7 @@ def apply_preset_to_model_store(selected_value: Optional[str]):
     try:
         from app import _load_user_presets_from_disk
         if not str(selected_value).startswith("user_"):
-            logger.debug("[ApplyPreset] Kein User-Preset")
+            _logger.debug("[ApplyPreset] Kein User-Preset")
             raise PreventUpdate
         
         user_id = selected_value[5:]
@@ -2650,19 +2650,19 @@ def apply_preset_to_model_store(selected_value: Optional[str]):
                 if model_path or snapshot_path:
                     model_exists = model_path and os.path.exists(model_path)
                     snapshot_exists = snapshot_path and os.path.exists(snapshot_path)
-                    logger.info(f"[ApplyPreset] Preset '{display_name}' geladen")
+                    _logger.info(f"[ApplyPreset] Preset '{display_name}' geladen")
                     return {
                         "path": model_path if model_exists else None,
                         "exog_snapshot_path": snapshot_path if snapshot_exists else None
                     }
         
-        logger.warning(f"[ApplyPreset] Preset-ID '{user_id}' nicht in Disk-Presets gefunden")
+        _logger.warning(f"[ApplyPreset] Preset-ID '{user_id}' nicht in Disk-Presets gefunden")
         raise PreventUpdate
     
     except PreventUpdate:
         raise
     except Exception as e:
-        logger.warning(f"[ApplyPreset] Fehler beim Anwenden: {e}")
+        _logger.warning(f"[ApplyPreset] Fehler beim Anwenden: {e}")
         raise PreventUpdate
 
 
@@ -2740,7 +2740,7 @@ def save_preset_with_name(n_clicks, preset_name, target_value, exog_values,
     try:
         from app import create_user_preset_from_ui_state, upsert_user_preset
         
-        logger.debug("[SavePresetModal] Speichervorgang gestartet")
+        _logger.debug("[SavePresetModal] Speichervorgang gestartet")
         
         if not preset_name or not preset_name.strip():
             target = str(target_value or "Preset").strip()
@@ -2748,10 +2748,10 @@ def save_preset_with_name(n_clicks, preset_name, target_value, exog_values,
             horizon = int(horizon_quarters or 0)
             ts = time.strftime("%Y-%m-%d %H:%M")
             preset_name = f"{target} | {len(exogs)} Exog | {horizon}Q @ {ts}"
-            logger.debug(f"[SavePresetModal] Auto-Name generiert: {preset_name}")
+            _logger.debug(f"[SavePresetModal] Auto-Name generiert: {preset_name}")
         else:
             preset_name = preset_name.strip()
-            logger.debug(f"[SavePresetModal] User-Name: {preset_name}")
+            _logger.debug(f"[SavePresetModal] User-Name: {preset_name}")
         
         target = str(target_value or "Preset").strip()
         exogs = list(exog_values or [])
@@ -2782,7 +2782,7 @@ def save_preset_with_name(n_clicks, preset_name, target_value, exog_values,
         return all_presets, new_dropdown_value, True, toast_children, ""
     
     except Exception as e:
-        logger.exception(f"[SavePresetModal] ✗ Fehler beim Speichern: {e}")
+        _logger.exception(f"[SavePresetModal] ✗ Fehler beim Speichern: {e}")
         
         error_toast = html.Div([
             html.Div("❌ Speichern fehlgeschlagen", className="fw-bold text-danger"),
@@ -3538,7 +3538,7 @@ def handle_custom_dataset_upload(contents, filename, last_modified):
         return payload, dbc.Alert(info, color="success", className="mt-2")
 
     except Exception as e:
-        logger.exception("[Upload] Fehler beim Einlesen des Custom-Datasets: %s", e)
+        _logger.exception("[Upload] Fehler beim Einlesen des Custom-Datasets: %s", e)
         msg = "Fehler beim Einlesen des Excel-Files. Bitte Struktur prüfen."
         return dash.no_update, dbc.Alert(msg, color="danger", className="mt-2")
 
@@ -3646,7 +3646,7 @@ def prewarm_hc_presets(n_clicks, gvb_json, exog_store_json):
             Log.scenario_table(msg)
         except Exception:
             try:
-                logger.info(msg)
+                _logger.info(msg)
             except Exception:
                 print(str(msg))
 
@@ -3829,7 +3829,7 @@ def show_initial_forecast_history(
         return fig
 
     except Exception as e:
-        logger.error(f"[InitialHistory] Fehler beim Laden der Historie: {e}")
+        _logger.error(f"[InitialHistory] Fehler beim Laden der Historie: {e}")
         return _empty_forecast_fig("Fehler beim Laden der historischen Daten")
 
 # ==============================================================================
@@ -3955,11 +3955,11 @@ def create_pipeline_forecast(
             preload_model_path=(model_payload or {}).get('path')
         )
 
-        logger.info(f"[Forecast] DataFrame-Spalten: {forecast_df.columns.tolist()}")
+        _logger.info(f"[Forecast] DataFrame-Spalten: {forecast_df.columns.tolist()}")
         if isinstance(metadata, dict):
-            logger.info(f"[Forecast] Metadata keys: {list(metadata.keys())}")
+            _logger.info(f"[Forecast] Metadata keys: {list(metadata.keys())}")
         else:
-            logger.info("[Forecast] Metadata ist kein dict – wird konvertiert")
+            _logger.info("[Forecast] Metadata ist kein dict – wird konvertiert")
 
         # 4) Chart bauen
         fig = _create_pipeline_chart(
@@ -3975,7 +3975,7 @@ def create_pipeline_forecast(
 
         # 5) Metriken
         simple = _compute_simple_metrics(metadata if isinstance(metadata, dict) else {})
-        logger.debug(f"Metriken berechnet: MAE={simple.get('mae', 0):.2f}, R²={simple.get('r2', 0):.3f}")
+        _logger.debug(f"Metriken berechnet: MAE={simple.get('mae', 0):.2f}, R²={simple.get('r2', 0):.3f}")
 
         def _fmt_num(x, nd=2, dash='—'):
             try:
@@ -4075,9 +4075,9 @@ def create_pipeline_forecast(
                 try:
                     # identische Struktur wie im Export: FORECAST_TS enthält forecast_df
                     forecast_df.to_excel(geo_excel_path, index=False, sheet_name="FORECAST_TS")
-                    logger.info(f"[Forecast|Geo] Geo-Forecast in {geo_excel_path} geschrieben.")
+                    _logger.info(f"[Forecast|Geo] Geo-Forecast in {geo_excel_path} geschrieben.")
                 except Exception as e_geo_write:
-                    logger.warning(f"[Forecast|Geo] Konnte Geo-Forecast-Excel nicht schreiben: {e_geo_write}")
+                    _logger.warning(f"[Forecast|Geo] Konnte Geo-Forecast-Excel nicht schreiben: {e_geo_write}")
                 else:
                     # run_meta.json im gleichen Run-Ordner anreichern
                     try:
@@ -4107,9 +4107,9 @@ def create_pipeline_forecast(
                         with meta_path.open("w", encoding="utf-8") as fh:
                             json.dump(run_meta, fh, ensure_ascii=False, indent=2)
 
-                        logger.info(f"[Forecast|Geo] run_meta mit Geo-Forecast aktualisiert: {meta_path}")
+                        _logger.info(f"[Forecast|Geo] run_meta mit Geo-Forecast aktualisiert: {meta_path}")
                     except Exception as e_meta:
-                        logger.warning(f"[Forecast|Geo] Konnte run_meta.json für Geo-Forecast nicht aktualisieren: {e_meta}")
+                        _logger.warning(f"[Forecast|Geo] Konnte run_meta.json für Geo-Forecast nicht aktualisieren: {e_meta}")
 
                     # Pfad zusätzlich im Metadata ablegen (optional für andere Callbacks)
                     if isinstance(metadata, dict):
@@ -4117,7 +4117,7 @@ def create_pipeline_forecast(
                         geo_meta["run_loader_dir"] = str(run_dir)
                         geo_meta["geo_forecast_path"] = str(geo_excel_path)
         except Exception as e_geo:
-            logger.warning(f"[Forecast|Geo] Fehler beim Persistieren des Geo-Forecasts: {e_geo}")
+            _logger.warning(f"[Forecast|Geo] Fehler beim Persistieren des Geo-Forecasts: {e_geo}")
 
         # 8) Payload für Export / Stores
         model_path = (metadata or {}).get("model_path") if isinstance(metadata, dict) else None
@@ -4145,7 +4145,7 @@ def create_pipeline_forecast(
         )
 
     except Exception as e:
-        logger.exception(f"[Forecast] Fehler: {e}")
+        _logger.exception(f"[Forecast] Fehler: {e}")
         empty_icicle = go.Figure(); empty_icicle.update_layout(template='plotly_white')
         fig, error_html, _ = _error_forecast_response(e)
         return (
@@ -4183,11 +4183,11 @@ def toggle_backtest_visualization(
     exog_json, exog_vars, sektor_value
 ):
     if not fc_state or not fc_state.get('has_forecast'):
-        logger.debug("[Backtest-Toggle] Kein Forecast vorhanden")
+        _logger.debug("[Backtest-Toggle] Kein Forecast vorhanden")
         return dash.no_update
 
     if not gvb_json:
-        logger.warning("[Backtest-Toggle] Keine GVB-Daten")
+        _logger.warning("[Backtest-Toggle] Keine GVB-Daten")
         return dash.no_update
 
     def _filter_gvb_json_by_sektor_fallback(gjson: str, sektor: str) -> str:
@@ -4202,10 +4202,10 @@ def toggle_backtest_visualization(
 
     try:
         backtest_mode = "overlay"
-        logger.debug(f"[Backtest-Toggle] show={show_backtest}, sektor={sektor_value}")
+        _logger.debug(f"[Backtest-Toggle] show={show_backtest}, sektor={sektor_value}")
 
         if not HAS_PIPELINE or DashboardForecastAdapter is None:
-            logger.error("[Backtest-Toggle] Pipeline nicht verfügbar")
+            _logger.error("[Backtest-Toggle] Pipeline nicht verfügbar")
             return dash.no_update
 
         try:
@@ -4246,11 +4246,11 @@ def toggle_backtest_visualization(
             backtest_mode=backtest_mode
         )
 
-        logger.debug("[Backtest-Toggle] Chart aktualisiert")
+        _logger.debug("[Backtest-Toggle] Chart aktualisiert")
         return fig
 
     except Exception as e:
-        logger.exception(f"[Backtest-Toggle] Fehler: {e}")
+        _logger.exception(f"[Backtest-Toggle] Fehler: {e}")
         return dash.no_update
 
 
@@ -4278,9 +4278,9 @@ def register_forecaster_callbacks(real_app: "dash.Dash", Log):
     Registriert alle gesammelten Callbacks an der echten Dash-App.
     """
     regs = getattr(app, "_registrations", [])
-    logger.info(f"Registriere {len(regs)} Forecaster-Callbacks")
+    _logger.info(f"Registriere {len(regs)} Forecaster-Callbacks")
     
     for args, kwargs, fn in regs:
         real_app.callback(*args, **kwargs)(fn)
     
-    logger.info("Forecaster-Callbacks erfolgreich registriert")
+    _logger.info("Forecaster-Callbacks erfolgreich registriert")

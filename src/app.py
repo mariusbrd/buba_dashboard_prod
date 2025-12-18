@@ -44,7 +44,7 @@ if not _logger.handlers:
     )
     _handler.setFormatter(_formatter)
     _logger.addHandler(_handler)
-logger = _logger  # Convenience alias
+_logger = _logger  # Convenience alias
 
 
 # ==============================================================================
@@ -62,25 +62,25 @@ class Log:
     """
 
     @staticmethod
-    def info(msg: str):        logger.info(msg)
+    def info(msg: str):        _logger.info(msg)
     @staticmethod
-    def warn(msg: str):        logger.warning(msg)
+    def warn(msg: str):        _logger.warning(msg)
     @staticmethod
-    def error(msg: str):       logger.error(msg)
+    def error(msg: str):       _logger.error(msg)
     @staticmethod
-    def exception(msg: str):   logger.exception(msg)
+    def exception(msg: str):   _logger.exception(msg)
 
     # Feature-Namespaces
     @staticmethod
-    def data(msg: str):        logger.info(f"[Data] {msg}")
+    def data(msg: str):        _logger.info(f"[Data] {msg}")
     @staticmethod
-    def forecast(msg: str):    logger.info(f"[Forecast] {msg}")
+    def forecast(msg: str):    _logger.info(f"[Forecast] {msg}")
     @staticmethod
-    def scenario(msg: str):    logger.info(f"[Scenario] {msg}")
+    def scenario(msg: str):    _logger.info(f"[Scenario] {msg}")
     @staticmethod
-    def ui(msg: str):          logger.info(f"[UI] {msg}")
+    def ui(msg: str):          _logger.info(f"[UI] {msg}")
     @staticmethod
-    def perf(msg: str):        logger.info(f"[Perf] {msg}")
+    def perf(msg: str):        _logger.info(f"[Perf] {msg}")
 
     # Optional: feinerer Namespace speziell für die Szenario-Tabelle
     SCENARIO_TABLE_NS = "ScenarioTable"
@@ -91,7 +91,7 @@ class Log:
         import logging as _pylogging
         _pylogging.getLogger(Log.SCENARIO_TABLE_NS).info(f"[ScenarioTable] {msg}")
         if also_root:
-            logger.info(f"[ScenarioTable] {msg}")
+            _logger.info(f"[ScenarioTable] {msg}")
 
     @staticmethod
     def enable_namespace(ns: str, level: int = logging.INFO):
@@ -141,7 +141,7 @@ try:
     HAS_STATSMODELS = True
 except ImportError:
     HAS_STATSMODELS = False
-    logger.info("Hinweis: statsmodels nicht installiert - ARIMAX-Features sind deaktiviert")
+    _logger.info("Hinweis: statsmodels nicht installiert - ARIMAX-Features sind deaktiviert")
 
 from sklearn.utils import resample
 
@@ -221,7 +221,7 @@ def _empty_dir_safe(path: Path) -> None:
     """Leert ein Verzeichnis sicher (Dateien/Symlinks löschen, Unterordner rekursiv)."""
     try:
         if not _is_under_app_root(path):
-            logger.warning(f"[SelfClean] Skip (outside APP_ROOT): {path}")
+            _logger.warning(f"[SelfClean] Skip (outside APP_ROOT): {path}")
             return
         path.mkdir(parents=True, exist_ok=True)
         for entry in path.iterdir():
@@ -231,10 +231,10 @@ def _empty_dir_safe(path: Path) -> None:
                 elif entry.is_dir():
                     shutil.rmtree(entry, ignore_errors=True)
             except Exception as e:
-                logger.warning(f"[SelfClean] Could not remove {entry}: {e}")
-        logger.info(f"[SelfClean] Emptied: {path}")
+                _logger.warning(f"[SelfClean] Could not remove {entry}: {e}")
+        _logger.info(f"[SelfClean] Emptied: {path}")
     except Exception as e:
-        logger.error(f"[SelfClean] Error cleaning {path}: {e}")
+        _logger.error(f"[SelfClean] Error cleaning {path}: {e}")
 
 
 def _delete_file_safe(path: Path) -> None:
@@ -242,19 +242,19 @@ def _delete_file_safe(path: Path) -> None:
     try:
         if path.exists() and path.is_file():
             if not _is_under_app_root(path):
-                logger.warning(f"[SelfClean] Skip file (outside APP_ROOT): {path}")
+                _logger.warning(f"[SelfClean] Skip file (outside APP_ROOT): {path}")
                 return
             path.unlink(missing_ok=True)
-            logger.info(f"[SelfClean] Removed file: {path.name}")
+            _logger.info(f"[SelfClean] Removed file: {path.name}")
     except Exception as e:
-        logger.warning(f"[SelfClean] Could not remove file {path}: {e}")
+        _logger.warning(f"[SelfClean] Could not remove file {path}: {e}")
 
 
 def _delete_older_than(path: Path, hours: int, pattern: str = "*") -> None:
     """Löscht nur Dateien im Verzeichnis, die älter als `hours` Stunden sind."""
     try:
         if not _is_under_app_root(path):
-            logger.warning(f"[SelfClean] Skip (outside APP_ROOT): {path}")
+            _logger.warning(f"[SelfClean] Skip (outside APP_ROOT): {path}")
             return
 
         cutoff = time.time() - hours * 3600
@@ -266,11 +266,11 @@ def _delete_older_than(path: Path, hours: int, pattern: str = "*") -> None:
                     mtime = entry.stat().st_mtime
                     if mtime < cutoff:
                         entry.unlink(missing_ok=True)
-                        logger.info(f"[SelfClean] [12h] Removed old file: {entry.name}")
+                        _logger.info(f"[SelfClean] [12h] Removed old file: {entry.name}")
             except Exception as e:
-                logger.warning(f"[SelfClean] [12h] Could not remove {entry}: {e}")
+                _logger.warning(f"[SelfClean] [12h] Could not remove {entry}: {e}")
     except Exception as e:
-        logger.error(f"[SelfClean] [12h] Error age-cleaning {path}: {e}")
+        _logger.error(f"[SelfClean] [12h] Error age-cleaning {path}: {e}")
 
 
 def self_clean_startup() -> None:
@@ -284,7 +284,7 @@ def self_clean_startup() -> None:
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" and os.environ.get("FLASK_ENV") == "development":
         pass
 
-    logger.info("[SelfClean] Startup: cleaning all relevant temp artefacts …")
+    _logger.info("[SelfClean] Startup: cleaning all relevant temp artefacts …")
 
     for p in ALWAYS_PURGE_PATHS:
         if p.is_dir():
@@ -303,7 +303,7 @@ def self_clean_shutdown(*_args, **_kwargs) -> None:
         return
     _SELF_CLEAN_STOP_RAN = True
 
-    logger.info("[SelfClean] Shutdown: cleaning all relevant temp artefacts …")
+    _logger.info("[SelfClean] Shutdown: cleaning all relevant temp artefacts …")
 
     for p in ALWAYS_PURGE_PATHS:
         if p.is_dir():
@@ -314,7 +314,7 @@ def self_clean_shutdown(*_args, **_kwargs) -> None:
 
 def _periodic_scenario_clean() -> None:
     """FEINE Routine: wird alle 12h ausgeführt, löscht nur Szenario-Artefakte."""
-    logger.info("[SelfClean] [12h] Periodic scenario clean …")
+    _logger.info("[SelfClean] [12h] Periodic scenario clean …")
     _delete_older_than(SCENARIO_DATA_DIR, SCENARIO_MAX_AGE_HOURS, pattern="analysis_data_*.xlsx")
     _delete_older_than(SCENARIO_MODELS_DIR, SCENARIO_MAX_AGE_HOURS, pattern="*.pkl")
     # nächsten Lauf wieder planen
@@ -440,7 +440,7 @@ def _save_user_presets_to_disk(presets: Dict[str, Any]) -> None:
         _atomic_write_text(PRESETS_FILE, json.dumps(presets, ensure_ascii=False, indent=2), encoding="utf-8")
         Log.data(f"Presets | saved | file={PRESETS_FILE.name} items={len(presets)}")
     except Exception as e:
-        logger.error(f"[Presets] Write error: {e}")
+        _logger.error(f"[Presets] Write error: {e}")
 
 
 def _model_path_for(target_slug: str, *, stamp: Optional[str] = None, ext: str = ".pkl") -> Path:
@@ -609,9 +609,9 @@ def delete_user_preset(*, preset_identifier: str, delete_files: bool = False):
                     try:
                         os.remove(p)
                     except Exception as e:
-                        logger.warning(f"[Presets] Datei nicht gelöscht ({p}): {e}")
+                        _logger.warning(f"[Presets] Datei nicht gelöscht ({p}): {e}")
         except Exception as e:
-            logger.warning(f"[Presets] Fehler beim Datei-Cleanup: {e}")
+            _logger.warning(f"[Presets] Fehler beim Datei-Cleanup: {e}")
 
     data.pop(to_delete_key, None)
     _save_user_presets_to_disk(data)
@@ -1192,13 +1192,13 @@ MIT automatischer Spalten-Korrektur für vertauschte bestand/fluss.
             # Fallback: Wenn gvb_output.xlsx fehlt (z.B. weil in .gitignore und frisch ausgecheckt),
             # versuchen wir sie zu generieren.
             if path.name == "gvb_output.xlsx":
-                logger.warning(f"LoadExcel | {path} fehlt – versuche instructor.py …")
+                _logger.warning(f"LoadExcel | {path} fehlt – versuche instructor.py …")
                 try:
                     # Versuche, die globale Funktion aufzurufen (falls definiert)
                     # run_instructor_loader() liegt weiter unten im Skript
                     rebuilt = run_instructor_loader()  # type: ignore
                     if rebuilt and rebuilt.exists():
-                        logger.info(f"LoadExcel | benutze neu erzeugte Datei: {rebuilt}")
+                        _logger.info(f"LoadExcel | benutze neu erzeugte Datei: {rebuilt}")
                         # Wir arbeiten mit dem neuen Pfad weiter (könnte Parquet sein, aber hier erwarten wir Excel-Logik)
                         # Da _load_excel spezifisch für Excel ist, hoffen wir, dass run_instructor_loader eine XLSX liefert oder wir sie lesen können.
                         # run_instructor_loader returns Path.
@@ -1216,7 +1216,7 @@ MIT automatischer Spalten-Korrektur für vertauschte bestand/fluss.
                             # Aber wir können es in die Logik von oben durchreichen? Nein.
                             # Wir loggen Warning und returnen empty, ABER beim nächsten Start wird _read_any Parquet nehmen.
                             # Oder wir geben hier auf.
-                             logger.warning(f"LoadExcel | Neu erzeugte Datei ist {rebuilt.suffix} ({rebuilt}), aber Excel erwartet.")
+                             _logger.warning(f"LoadExcel | Neu erzeugte Datei ist {rebuilt.suffix} ({rebuilt}), aber Excel erwartet.")
                              # Wir versuchen es trotzdem, vllt hat instructor AUCH xlsx erzeugt (macht es meistens).
                              # Wir checken, ob die ursprünglich angefragte Datei jetzt existiert?
                              if path.exists():
@@ -1227,10 +1227,10 @@ MIT automatischer Spalten-Korrektur für vertauschte bestand/fluss.
                     else:
                         return pd.DataFrame()
                 except NameError:
-                    logger.error("LoadExcel | run_instructor_loader() nicht verfügbar.")
+                    _logger.error("LoadExcel | run_instructor_loader() nicht verfügbar.")
                     return pd.DataFrame()
                 except Exception as e:
-                    logger.error(f"LoadExcel | Generierung fehlgeschlagen: {e}")
+                    _logger.error(f"LoadExcel | Generierung fehlgeschlagen: {e}")
                     return pd.DataFrame()
             else:
                 return pd.DataFrame()
@@ -1239,20 +1239,20 @@ MIT automatischer Spalten-Korrektur für vertauschte bestand/fluss.
 
         # 2) Zu klein oder LFS? → versuchen neu zu bauen
         if use_path.stat().st_size < 2048 or _is_lfs_pointer(use_path):
-            logger.warning(f"LoadExcel | {use_path} ist zu klein oder ein Git-LFS-Pointer – versuche instructor.py …")
+            _logger.warning(f"LoadExcel | {use_path} ist zu klein oder ein Git-LFS-Pointer – versuche instructor.py …")
             rebuilt = None
             try:
                 # run_instructor_loader ist weiter unten im Modul definiert,
                 # kann hier aber zur Laufzeit aufgerufen werden
                 rebuilt = run_instructor_loader()  # type: ignore
             except NameError:
-                logger.error("LoadExcel | run_instructor_loader() nicht definiert – kann Datei nicht neu erstellen.")
+                _logger.error("LoadExcel | run_instructor_loader() nicht definiert – kann Datei nicht neu erstellen.")
             except Exception as e:
-                logger.error(f"LoadExcel | instructor.py konnte nicht ausgeführt werden: {e}")
+                _logger.error(f"LoadExcel | instructor.py konnte nicht ausgeführt werden: {e}")
 
             if rebuilt and rebuilt.exists():
                 use_path = rebuilt
-                logger.info(f"LoadExcel | benutze neu erzeugte Datei: {use_path}")
+                _logger.info(f"LoadExcel | benutze neu erzeugte Datei: {use_path}")
             else:
                 # nichts brauchbares erzeugt → leer zurück
                 return pd.DataFrame()
@@ -1263,7 +1263,7 @@ MIT automatischer Spalten-Korrektur für vertauschte bestand/fluss.
             xl = pd.ExcelFile(use_path, engine="openpyxl")
             Log.data(f"LoadExcel | sheets | names={xl.sheet_names}")
         except Exception as e:
-            logger.error(f"❌ Excel-Fehler: {e}")
+            _logger.error(f"❌ Excel-Fehler: {e}")
             return pd.DataFrame()
 
         frames: list[pd.DataFrame] = []
@@ -1274,7 +1274,7 @@ MIT automatischer Spalten-Korrektur für vertauschte bestand/fluss.
                 try:
                     Log.warn(f"LoadExcel | missing sheet | name={sheet}")
                 except Exception:
-                    logger.warning(f"LoadExcel | missing sheet | name={sheet}")
+                    _logger.warning(f"LoadExcel | missing sheet | name={sheet}")
                 continue
 
             try:
@@ -1337,13 +1337,13 @@ MIT automatischer Spalten-Korrektur für vertauschte bestand/fluss.
                 frames.append(df)
 
             except Exception as e:
-                logger.error(f"❌ Fehler in Sheet '{sheet}': {e}")
+                _logger.error(f"❌ Fehler in Sheet '{sheet}': {e}")
                 import traceback
                 traceback.print_exc()
 
         # 6) alles zusammenführen
         if not frames:
-            logger.error("❌ Keine Frames aus Excel erstellt.")
+            _logger.error("❌ Keine Frames aus Excel erstellt.")
             return pd.DataFrame(columns=["date", "ebene1", "ebene2", "ebene3", "bestand", "fluss", "sektor", "datatype"])
 
         Log.data(f"LoadExcel | merge | frames={len(frames)}")
@@ -1415,8 +1415,8 @@ from scipy.stats import linregress
 CANON_LEVELS = ("ebene1", "ebene2", "ebene3")
 CANON_VALUES = ("bestand", "fluss")
 
-# ========== LOGGER ==========
-logger = logging.getLogger("GVB_Dashboard")
+# ========== _logger ==========
+_logger = logging.getLogger("GVB_Dashboard")
 
 # ========== HELPER ==========
 def _normalize_value_columns_fallback(df: pd.DataFrame) -> pd.DataFrame:
@@ -1462,7 +1462,7 @@ class DataManager:
         self._exog = self._ensure_canonical_schema_exog(exog_raw)
         self._cache: Dict[Tuple, pd.DataFrame] = {}
 
-        logger.info(f"[DataManager] Initialisiert: GVB={len(self._gvb)} rows, EXOG={len(self._exog)} rows")
+        _logger.info(f"[DataManager] Initialisiert: GVB={len(self._gvb)} rows, EXOG={len(self._exog)} rows")
 
     # ------------------------------------------------------------------
     # Hilfsfunktionen (Canon, Cache, Filter, Aggregation)
@@ -1730,7 +1730,7 @@ class DataManager:
         """
         Erzwingt kanonisches Schema: ['date', ebene1..3, bestand, fluss]
         """
-        logger.info(f"[_ensure_canonical_schema_gvb] START | Input shape: {df.shape if df is not None else 'None'}")
+        _logger.info(f"[_ensure_canonical_schema_gvb] START | Input shape: {df.shape if df is not None else 'None'}")
 
         if df is None or df.empty:
             return pd.DataFrame(columns=["date", *CANON_LEVELS, *CANON_VALUES])
@@ -1904,16 +1904,16 @@ try:
     from src.backend.forecaster.forecast_integration import DashboardForecastAdapter as _Adapter
     DashboardForecastAdapter = _Adapter
     HAS_PIPELINE = True
-    logger.info("✓ Pipeline-Integration geladen (src.backend.forecaster.forecast_integration)")
+    _logger.info("✓ Pipeline-Integration geladen (src.backend.forecaster.forecast_integration)")
 except Exception as e_pkg:
     try:
         # Fallback: Modul direkt unter forecaster/ via sys.path
         from src.backend.forecaster.forecast_integration import DashboardForecastAdapter as _Adapter 
         DashboardForecastAdapter = _Adapter
         HAS_PIPELINE = True
-        logger.info("✓ Pipeline-Integration geladen (src.backend.forecaster.forecast_integration)")
+        _logger.info("✓ Pipeline-Integration geladen (src.backend.forecaster.forecast_integration)")
     except Exception as e_mod:
-        logger.warning(f"⚠️ Pipeline nicht verfügbar: {e_mod}")
+        _logger.warning(f"⚠️ Pipeline nicht verfügbar: {e_mod}")
 # Loader integration
 loader_path = Path(__file__).parent / "loader"
 if str(loader_path) not in sys.path:
@@ -1922,10 +1922,10 @@ if str(loader_path) not in sys.path:
 try:
     from src.backend.loader.exog_instructor import download_ecb_indicators
     HAS_INSTRUCTOR = True
-    logger.info("✓ exog_instructor erfolgreich importiert")
+    _logger.info("✓ exog_instructor erfolgreich importiert")
 except ImportError as e:
     HAS_INSTRUCTOR = False
-    logger.warning(f"⚠️ exog_instructor konnte nicht importiert werden: {e}")
+    _logger.warning(f"⚠️ exog_instructor konnte nicht importiert werden: {e}")
 # --- Scenario-Downloader Integration (beim App-Start) ---
 scenario_path = Path(__file__).parent / "frontend/scenario"
 if str(scenario_path) not in sys.path:
@@ -1934,10 +1934,10 @@ if str(scenario_path) not in sys.path:
 try:
     from src.frontend.scenario.scenario_dataloader import DashDownloadConfig, DashDataDownloader  # nutzt deinen Adapter
     HAS_SCENARIO_DOWNLOADER = True
-    logger.info("✓ Scenario-Downloader geladen")
+    _logger.info("✓ Scenario-Downloader geladen")
 except ImportError as e:
     HAS_SCENARIO_DOWNLOADER = False
-    logger.warning(f"⚠️ Scenario-Downloader nicht verfügbar: {e}")
+    _logger.warning(f"⚠️ Scenario-Downloader nicht verfügbar: {e}")
 
 
 # ==============================================================================
@@ -2037,7 +2037,7 @@ def run_instructor_loader() -> Path:
     """Führt loader/instructor.py aus und liefert den Pfad zur erzeugten GVB-Datei zurück.
     Bevorzugt die neue loader/gvb_output.parquet.
     """
-    logger.info("📊 Lade echte GVB-Daten...")
+    _logger.info("📊 Lade echte GVB-Daten...")
     current_dir = APP_ROOT
     loader_dir = current_dir / "loader"
     instructor_py = loader_dir / "instructor.py"
@@ -2051,7 +2051,7 @@ def run_instructor_loader() -> Path:
     env["PYTHONIOENCODING"] = "utf-8"
 
     try:
-        logger.info(f"Führe aus: {instructor_py}")
+        _logger.info(f"Führe aus: {instructor_py}")
         result = subprocess.run(
             [sys.executable, str(instructor_py)],
             cwd=str(loader_dir),
@@ -2063,17 +2063,17 @@ def run_instructor_loader() -> Path:
 
         if result.returncode != 0:
             if result.stderr:
-                logger.info(f"STDERR: {result.stderr}")
+                _logger.info(f"STDERR: {result.stderr}")
             raise RuntimeError(f"instructor.py fehlgeschlagen (Exit Code: {result.returncode})")
 
-        logger.info("instructor.py erfolgreich ausgeführt")
+        _logger.info("instructor.py erfolgreich ausgeführt")
         if result.stdout:
-            logger.info(f"STDOUT: {result.stdout}")
+            _logger.info(f"STDOUT: {result.stdout}")
 
         # NEU: zuerst nach Parquet im loader/ schauen
         output_loader_parquet = loader_dir / "gvb_output.parquet"
         if output_loader_parquet.exists():
-            logger.info(f"✅ gvb_output.parquet bereit: {output_loader_parquet}")
+            _logger.info(f"✅ gvb_output.parquet bereit: {output_loader_parquet}")
             return output_loader_parquet
 
         # ab hier: Legacy-Pfade wie bisher
@@ -2090,10 +2090,10 @@ def run_instructor_loader() -> Path:
                 pass
 
         if output_root_xlsx.exists():
-            logger.info(f"✅ gvb_output.xlsx bereit: {output_root_xlsx}")
+            _logger.info(f"✅ gvb_output.xlsx bereit: {output_root_xlsx}")
             return output_root_xlsx
         if output_loader_xlsx.exists():
-            logger.info(f"✅ gvb_output.xlsx gefunden (loader): {output_loader_xlsx}")
+            _logger.info(f"✅ gvb_output.xlsx gefunden (loader): {output_loader_xlsx}")
             return output_loader_xlsx
 
         raise FileNotFoundError("gvb_output.* wurde nicht erstellt (weder Parquet noch Excel).")
@@ -2144,19 +2144,19 @@ def load_gvb_excel_or_build() -> pathlib.Path | None:
     # 2) gibt es schon eine brauchbare Datei?
     for cand in candidates:
         if cand.exists() and not _is_lfs_or_too_small(cand):
-            logger.info(f"✅ gvb_output.* gefunden und verwendbar: {cand}")
+            _logger.info(f"✅ gvb_output.* gefunden und verwendbar: {cand}")
             return cand
 
     # 3) wenn wir hier sind: nichts Brauchbares → instructor anwerfen
     try:
         rebuilt_path = run_instructor_loader()
         if rebuilt_path and rebuilt_path.exists() and not _is_lfs_or_too_small(rebuilt_path):
-            logger.info(f"✅ gvb_output.* neu erstellt: {rebuilt_path}")
+            _logger.info(f"✅ gvb_output.* neu erstellt: {rebuilt_path}")
             return rebuilt_path
     except Exception as e:
-        logger.error(f"❌ Konnte gvb_output.* nicht neu erstellen: {e}")
+        _logger.error(f"❌ Konnte gvb_output.* nicht neu erstellen: {e}")
 
-    logger.error("❌ gvb_output.* weder gefunden noch erstellen können.")
+    _logger.error("❌ gvb_output.* weder gefunden noch erstellen können.")
     return None
 
 
@@ -2165,14 +2165,14 @@ def load_gvb_excel_or_build() -> pathlib.Path | None:
 
 def create_synthetic_exog_data(gvb_data):
     """Erstellt synthetische exogene Daten basierend auf dem Zeitraum der echten GVB-Daten"""
-    logger.info("📄 Generiere passende Makrodaten...")
+    _logger.info("📄 Generiere passende Makrodaten...")
     # Zeitraum aus GVB-Daten ableiten
     start_date = gvb_data['date'].min()
     end_date = gvb_data['date'].max()
     dates = pd.date_range(start_date, end_date, freq='Q')
     n_periods = len(dates)
     
-    logger.info(f"Makrodaten-Zeitraum: {start_date} bis {end_date} ({n_periods} Quartale)")
+    _logger.info(f"Makrodaten-Zeitraum: {start_date} bis {end_date} ({n_periods} Quartale)")
     # Zeittrend für realistische Entwicklung
     time_trend = np.arange(n_periods) / n_periods
     
@@ -2243,7 +2243,7 @@ def create_synthetic_exog_data(gvb_data):
         'sparquote': sparquote
     })
     
-    logger.info(f"✅ Makrodaten generiert: {exog_df.shape}")
+    _logger.info(f"✅ Makrodaten generiert: {exog_df.shape}")
     return exog_df
 
 
@@ -2285,14 +2285,14 @@ def ensure_monthly_gvb_refresh() -> Path | None:
         return None
 
     # anderer Monat oder kein Marker → neu laden
-    logger = logging.getLogger("GVB_Dashboard")
-    logger.info(f"[MonthlyRefresh] Neuer Monat erkannt (alt={last_month}, neu={current_month}) – lade GVB neu …")
+    _logger = logging.getLogger("GVB_Dashboard")
+    _logger.info(f"[MonthlyRefresh] Neuer Monat erkannt (alt={last_month}, neu={current_month}) – lade GVB neu …")
 
     new_path = None
     try:
         new_path = run_instructor_loader()
     except Exception as e:
-        logger.error(f"[MonthlyRefresh] Fehler beim monatlichen Reload: {e}")
+        _logger.error(f"[MonthlyRefresh] Fehler beim monatlichen Reload: {e}")
         return None
 
     # Marker aktualisieren
@@ -2300,7 +2300,7 @@ def ensure_monthly_gvb_refresh() -> Path | None:
         loader_dir.mkdir(parents=True, exist_ok=True)
         marker_file.write_text(current_month, encoding="utf-8")
     except Exception as e:
-        logger.warning(f"[MonthlyRefresh] Konnte Marker-Datei nicht schreiben: {e}")
+        _logger.warning(f"[MonthlyRefresh] Konnte Marker-Datei nicht schreiben: {e}")
 
     return new_path
 
@@ -2386,7 +2386,7 @@ def format_axis_quarters(fig, date_iterable):
             tickangle=-45,
         )
     except Exception as e:
-        logger.warning(f"Failed to format axis quarters: {e}")
+        _logger.warning(f"Failed to format axis quarters: {e}")
 
     
 # ==============================================================================
@@ -4123,7 +4123,7 @@ def run_startup_preloads():
         geo_results = rebuild_deutschlandatlas_files(
             levels=("krs", "gem", "vbgem"),  # explizit alle Ebenen
             export_excel=False,              # kein Excel-Export
-            logger=lambda m: lg.info(str(m))
+            _logger=lambda m: lg.info(str(m))
         )
 
         if geo_results:
@@ -4185,7 +4185,7 @@ def run_startup_preloads():
                 lg.info(f"⏬ Lade Szenario Daten ({cfg.start_date} → {cfg.end_date}) …")
                 runner = DashDataDownloader(
                     cfg,
-                    logger=lambda m: (Log.scenario(m) if 'Log' in globals() else lg.info(str(m)))
+                    _logger=lambda m: (Log.scenario(m) if 'Log' in globals() else lg.info(str(m)))
                 )
                 final_df, written_file = runner.run(save=True)
                 mark_ran_this_month(scenario_path)
@@ -4220,7 +4220,7 @@ import time
 
 def _run_preload_with_lock():
     """Führt Preload mit File-Lock aus - nur ein Worker generiert Dateien."""
-    lock_file = Path("/app/.gvb_preload.lock")  # Im App-Verzeichnis (nicht /tmp)
+    lock_file = Path("/app/.gvb_p reload.lock")  # Im App-Verzeichnis (nicht /tmp)
     lg = logging.getLogger("GVB_Dashboard")
     
     try:

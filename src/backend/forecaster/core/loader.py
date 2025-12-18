@@ -4,7 +4,7 @@
 from pathlib import Path
 from typing import List
 
-from backend.forecaster.forecaster_pipeline import LOGGER
+from backend.forecaster.forecaster_pipeline import _logger
 
 import pandas as pd
 
@@ -18,9 +18,9 @@ def safe_write_csv(df: pd.DataFrame, path: Union[str, Path], label: str = "CSV")
     try:
         ensure_dir(Path(path).parent)
         df.to_csv(path, index=False)
-        LOGGER.debug(f"{label} geschrieben: {path}")
+        _logger.debug(f"{label} geschrieben: {path}")
     except Exception as e:
-        LOGGER.error(f"{label} konnte nicht geschrieben werden: {e}")
+        _logger.error(f"{label} konnte nicht geschrieben werden: {e}")
 
 
 def safe_write_json(obj, path: Union[str, Path], label: str = "JSON") -> None:
@@ -29,9 +29,9 @@ def safe_write_json(obj, path: Union[str, Path], label: str = "JSON") -> None:
         ensure_dir(Path(path).parent)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(obj, f, indent=2, ensure_ascii=False)
-        LOGGER.debug(f"{label} geschrieben: {path}")
+        _logger.debug(f"{label} geschrieben: {path}")
     except Exception as e:
-        LOGGER.error(f"{label} konnte nicht geschrieben werden: {e}")
+        _logger.error(f"{label} konnte nicht geschrieben werden: {e}")
 
 
 def harvest_exogs_from_downloader_output(path: str) -> List[str]:

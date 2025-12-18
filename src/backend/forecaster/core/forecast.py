@@ -1,6 +1,6 @@
 from backend.forecaster.core.config import Config
 from backend.forecaster.core.extrapolation import _extrapolate_drift_seasonal, extrapolate_with_arima
-from backend.forecaster.forecaster_pipeline import LOGGER
+from backend.forecaster.forecaster_pipeline import _logger
 
 
 import numpy as np
@@ -30,8 +30,8 @@ def recursive_forecast(model, tj, fut_designs: pd.DataFrame, X_cols: List[str], 
             except Exception:
                 pass
 
-    LOGGER.debug(f"[Recur] Starte rekursive Prognose über {H} Quartale")
-    LOGGER.debug(f"[Recur] Target-Lags: {target_lag_info}")
+    _logger.debug(f"[Recur] Starte rekursive Prognose über {H} Quartale")
+    _logger.debug(f"[Recur] Target-Lags: {target_lag_info}")
 
     stable_cols: List[str] = list(getattr(cfg, "stable_exog_cols", []) or [])
     stable_cols = [c for c in stable_cols if c in X_cols]
@@ -60,7 +60,7 @@ def recursive_forecast(model, tj, fut_designs: pd.DataFrame, X_cols: List[str], 
             else:
                 n_nan = int(df[c].isna().sum())
                 if n_nan > 0:
-                    LOGGER.warning(
+                    _logger.warning(
                         f"[Recur] Feature '{c}' hat {n_nan} NaN in Zukunft – Fallback 0 (Median/Drift bereitstellen)."
                     )
                     df[c] = df[c].fillna(0.0)
@@ -71,7 +71,7 @@ def recursive_forecast(model, tj, fut_designs: pd.DataFrame, X_cols: List[str], 
         nan_before = int(np.isnan(df.to_numpy()).sum())
         inf_before = int(np.isinf(df.to_numpy()).sum())
         if nan_before or inf_before:
-            LOGGER.warning(
+            _logger.warning(
                 f"[Recur] Nichtendliche Werte vor Start (NaN={nan_before}, Inf={inf_before}) – sichere Füllung."
             )
             df = df.replace([np.inf, -np.inf], np.nan).ffill().bfill()
@@ -89,7 +89,7 @@ def recursive_forecast(model, tj, fut_designs: pd.DataFrame, X_cols: List[str], 
         for lag_col in target_lag_info:
             if lag_col in row.columns and row[lag_col].isna().any():
                 if last_target_value is not None and np.isfinite(last_target_value):
-                    LOGGER.warning(
+                    _logger.warning(
                         f"[Recur] {lag_col} NaN in Schritt {h+1} – setze Fallback last_target_value={last_target_value}."
                     )
                     row[lag_col] = row[lag_col].fillna(float(last_target_value))
@@ -126,7 +126,7 @@ def recursive_forecast(model, tj, fut_designs: pd.DataFrame, X_cols: List[str], 
             y_hat = y_hat_t
 
         if not np.isfinite(y_hat):
-            LOGGER.warning(f"[Recur] Nichtendliche Prognose in Schritt {h+1} – setze 0.0 als Fallback.")
+            _logger.warning(f"[Recur] Nichtendliche Prognose in Schritt {h+1} – setze 0.0 als Fallback.")
             y_hat = 0.0
 
         y_pred.append(float(y_hat))
@@ -150,7 +150,7 @@ def recursive_forecast(model, tj, fut_designs: pd.DataFrame, X_cols: List[str], 
         deg_fix_enabled = bool(getattr(cfg, "degenerate_fix", True))
         var_y = float(np.nanstd(y_arr)) if len(y_arr) else 0.0
         if deg_fix_enabled and (var_y < 1e-8 or np.allclose(y_arr, y_arr[0], atol=1e-8)):
-            LOGGER.warning("[Recur] Prognose ist (nahezu) konstant – wende sanftes Post-Processing an.")
+            _logger.warning("[Recur] Prognose ist (nahezu) konstant – wende sanftes Post-Processing an.")
             sigma = getattr(cfg, "cv_residual_std", None)
             if sigma is None:
                 sigma = getattr(cfg, "fallback_sigma", None)
@@ -165,9 +165,9 @@ def recursive_forecast(model, tj, fut_designs: pd.DataFrame, X_cols: List[str], 
             noise = rng.normal(0.0, amp * 0.15, H) if H > 1 else np.array([0.0])
             y_arr = y_arr + ramp + noise
     except Exception as e:
-        LOGGER.warning(f"[Recur] Degeneracy-Post-Processing übersprungen: {e}")
+        _logger.warning(f"[Recur] Degeneracy-Post-Processing übersprungen: {e}")
 
-    LOGGER.debug(f"[Recur] Done. Prognosen: {y_arr}")
+    _logger.debug(f"[Recur] Done. Prognosen: {y_arr}")
     return y_arr
 
 
@@ -191,7 +191,7 @@ def impute_future_exog_quarterly(
     requested = list(exog_var_names or [])
 
     if verbose:
-        LOGGER.debug(f"[FUT-EXOG] Angefordert ({len(requested)}): {requested}")
+        _logger.debug(f"[FUT-EXOG] Angefordert ({len(requested)}): {requested}")
 
     if "Quarter" in hist_quarter_df.columns:
         q_idx = pd.PeriodIndex(hist_quarter_df["Quarter"], freq="Q")
@@ -208,10 +208,10 @@ def impute_future_exog_quarterly(
 
     last_q = q_idx.max()
     if verbose:
-        LOGGER.debug(f"[FUT-EXOG] Input-DF (hist): {hist_quarter_df.shape} | horizon: {H}")
-        LOGGER.debug(f"[FUT-EXOG] Letztes Q: {last_q} | Forecast-Q: {list(future_quarters)}")
+        _logger.debug(f"[FUT-EXOG] Input-DF (hist): {hist_quarter_df.shape} | horizon: {H}")
+        _logger.debug(f"[FUT-EXOG] Letztes Q: {last_q} | Forecast-Q: {list(future_quarters)}")
     if debug_exog:
-        LOGGER.debug("[FUT-EXOG|Diag] Verfügbare Hist-Spalten (Top 25): %s", list(hist_clean.columns)[:25])
+        _logger.debug("[FUT-EXOG|Diag] Verfügbare Hist-Spalten (Top 25): %s", list(hist_clean.columns)[:25])
 
     available_in_hist: List[str] = []
     not_found: List[str] = []
@@ -239,11 +239,11 @@ def impute_future_exog_quarterly(
             resolved_map[req] = picked
 
     if not_found and verbose:
-        LOGGER.warning(f"[FUT-EXOG] Nicht exakt gefunden (übersprungen): {not_found}")
+        _logger.warning(f"[FUT-EXOG] Nicht exakt gefunden (übersprungen): {not_found}")
     if verbose:
-        LOGGER.debug(f"[FUT-EXOG] Aufgelöst ({len(available_in_hist)}): {available_in_hist}")
+        _logger.debug(f"[FUT-EXOG] Aufgelöst ({len(available_in_hist)}): {available_in_hist}")
     if debug_exog:
-        LOGGER.debug("[FUT-EXOG|Resolve] Mapping: %s", resolved_map)
+        _logger.debug("[FUT-EXOG|Resolve] Mapping: %s", resolved_map)
 
     fut_df = pd.DataFrame(index=future_quarters)
 
@@ -253,7 +253,7 @@ def impute_future_exog_quarterly(
         series = pd.to_numeric(hist_clean[var], errors="coerce").dropna()
         if series.empty:
             if verbose:
-                LOGGER.warning(f"[FUT-EXOG] {var}: Keine historischen Werte – Variable wird ausgelassen.")
+                _logger.warning(f"[FUT-EXOG] {var}: Keine historischen Werte – Variable wird ausgelassen.")
             continue
 
         n_hist = len(series)
@@ -261,7 +261,7 @@ def impute_future_exog_quarterly(
 
         if n_hist < 4:
             if verbose:
-                LOGGER.debug(f"[FUT-EXOG] {var}: Zu wenig Daten (n={n_hist}), nutze LOCF")
+                _logger.debug(f"[FUT-EXOG] {var}: Zu wenig Daten (n={n_hist}), nutze LOCF")
             fut_df[var] = np.full(H, last_val, dtype=float)
             continue
 
@@ -292,7 +292,7 @@ def impute_future_exog_quarterly(
                 method = "arima"
             except Exception as e:
                 if verbose:
-                    LOGGER.warning(f"[FUT-EXOG] {var}: ARIMA fehlgeschlagen ({e}) – fallback zu Drift+Seasonal")
+                    _logger.warning(f"[FUT-EXOG] {var}: ARIMA fehlgeschlagen ({e}) – fallback zu Drift+Seasonal")
                 vals = _extrapolate_drift_seasonal(
                     series, H, drift_window_q, seasonal_period_q, last_q, verbose, var
                 )
@@ -313,9 +313,9 @@ def impute_future_exog_quarterly(
 
         if debug_exog:
             head = vals[: min(3, H)]
-            LOGGER.debug("[FUT-EXOG|%s] Methode=%s, Fut-Head=%s", var, method, np.asarray(head).round(6).tolist())
+            _logger.debug("[FUT-EXOG|%s] Methode=%s, Fut-Head=%s", var, method, np.asarray(head).round(6).tolist())
 
     if fut_df.empty and verbose:
-        LOGGER.warning("[FUT-EXOG] Keine exogenen Zukunftswerte generiert (alle angeforderten Variablen fehlen).")
+        _logger.warning("[FUT-EXOG] Keine exogenen Zukunftswerte generiert (alle angeforderten Variablen fehlen).")
 
     return fut_df

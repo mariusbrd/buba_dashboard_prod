@@ -1,10 +1,14 @@
+import os
+from pathlib import Path
 from typing import List
 import numpy as np
 import pandas as pd
 
 from backend.forecaster.core.config import Config
 from backend.forecaster.core.forecast import impute_future_exog_quarterly
-from backend.forecaster.forecaster_pipeline import LOGGER
+from backend.forecaster.core.loader import _to_jsonable, safe_write_csv, safe_write_json
+from backend.forecaster.core.metrics import _cv_vals
+from backend.forecaster.forecaster_pipeline import _logger
 
 
 def _fmt(x, ndigits=2, default="n/a"):
@@ -192,8 +196,8 @@ def build_future_design(
     H = int(getattr(cfg, "forecast_horizon", 4))
     fut_Q = pd.period_range(last_q + 1, periods=H, freq=last_q.freq or "Q")
 
-    LOGGER.debug("\n[Design] Impute future exog …")
-    LOGGER.debug(f"[Design] Strategy: {getattr(cfg, 'future_exog_strategy', 'mixed')}")
+    _logger.debug("\n[Design] Impute future exog …")
+    _logger.debug(f"[Design] Strategy: {getattr(cfg, 'future_exog_strategy', 'mixed')}")
 
     # 2) Exog-Wunschliste und deterministische Spalten definieren
     det_cols_hist = [c for c in df_hist.columns if c.startswith(("DET_", "SEAS_"))]
@@ -212,11 +216,11 @@ def build_future_design(
                     unresolved.append(req)
             exog_resolved = list(dict.fromkeys(mapped))
             if unresolved:
-                LOGGER.warning(
+                _logger.warning(
                     f"[Design] Exog nicht in Historie gefunden (werden übersprungen/fallen auf Fallbacks): {unresolved}"
                 )
         except Exception as e:
-            LOGGER.warning(f"[Design] resolve_exogs fehlgeschlagen ({e}) – nutze Wunschliste roh.")
+            _logger.warning(f"[Design] resolve_exogs fehlgeschlagen ({e}) – nutze Wunschliste roh.")
             exog_resolved = None
 
     exog_wishlist = exog_resolved if (exog_resolved is not None and len(exog_resolved) > 0) else exog_wishlist_raw
@@ -254,7 +258,7 @@ def build_future_design(
                 rename_to_last[nm] = last_nm
     if rename_to_last:
         fut_exog_base = fut_exog_base.rename(columns=rename_to_last)
-        LOGGER.debug(f"[Design] Renamed future exog to __last__: {rename_to_last}")
+        _logger.debug(f"[Design] Renamed future exog to __last__: {rename_to_last}")
 
     # 6) Deterministische Zukunftsfeatures
     fut_det = pd.DataFrame(index=fut_Q)
@@ -272,7 +276,7 @@ def build_future_design(
         qnum = pd.Series([q.quarter for q in fut_Q], index=fut_Q)
         for q_val in [1, 2, 3]:
             fut_det[f"SEAS_Q{q_val}"] = (qnum == q_val).astype(int)
-        LOGGER.debug(f"[Design] Saisondummies Q1-3 für {len(fut_Q)} Quartale gesetzt")
+        _logger.debug(f"[Design] Saisondummies Q1-3 für {len(fut_Q)} Quartale gesetzt")
 
     # 7) Lags für Exogs der Zukunft
     lags_q = sorted(set(getattr(cfg, "target_lags_q", [1, 2, 4])))
@@ -331,7 +335,7 @@ def build_future_design(
                 vals.append(float(val))
             tgt_lag_block[col] = vals
     else:
-        LOGGER.warning("[Design] Konnte Target-Serie für TARGET__lag-* nicht finden.")
+        _logger.warning("[Design] Konnte Target-Serie für TARGET__lag-* nicht finden.")
 
     # 9) Alles zusammenführen
     fut_designs = pd.concat([fut_det, fut_exog_lags, tgt_lag_block], axis=1)
@@ -343,7 +347,7 @@ def build_future_design(
             fut_designs[num_cols].replace([np.inf, -np.inf], np.nan).ffill().bfill().fillna(0.0)
         )
 
-    LOGGER.debug(f"[Design] Zukunfts-Design (roh): {fut_designs.shape[0]} Quartale, {fut_designs.shape[1]} Features")
+    _logger.debug(f"[Design] Zukunfts-Design (roh): {fut_designs.shape[0]} Quartale, {fut_designs.shape[1]} Features")
 
     # 10) Schritt 9: direkt hier sicherstellen, dass alle Modell-Features vorhanden sind
     if X_cols is not None and df_feats is not None:
@@ -353,7 +357,7 @@ def build_future_design(
             cfg=cfg,
             hist_feats=df_feats,
         )
-        LOGGER.debug(f"[Design] Zukunfts-Design (final): {fut_designs.shape[0]} Quartale, {fut_designs.shape[1]} Features")
+        _logger.debug(f"[Design] Zukunfts-Design (final): {fut_designs.shape[0]} Quartale, {fut_designs.shape[1]} Features")
 
     return fut_designs
 
@@ -364,5 +368,94 @@ def _canonical_exog_name(name: str) -> str:
         n = n.replace(suf, "")
     n = n.split("__lag-")[0]
     return n
+
+
+def _export_prediction(ctx: dict, df_results: pd.DataFrame, preds: np.ndarray) -> dict:
+    """
+    Exports prediction CSV + Metadata JSON and persists results.
+
+    Returns:
+        metadata_export 
+    """
+    cfg: Config = ctx["cfg"]
+
+    output_path = os.path.join(cfg.output_dir, "production_prediction.csv")
+    safe_write_csv(df_results, output_path, "[S3] Prediction")
+
+    metadata_export = (ctx["metadata"] or {}).copy()
+    metadata_export["prediction_timestamp"] = pd.Timestamp.now().isoformat()
+    metadata_export["model_source"] = "cached" if ctx.get("skip_training") else "fresh_training"
+    metadata_export["exog_source"] = {
+        "mode": "downloader" if getattr(cfg, "use_downloader_exog", False) else "manual",
+        "selected_exog": list(getattr(cfg, "selected_exog", []) or []),
+        "downloader_output_path": getattr(cfg, "downloader_output_path", None),
+    }
+
+    metadata_export["train_quarterly_csv"] = cfg.dump_quarterly_dataset_path or str(
+        Path(cfg.output_dir) / "train_quarterly_debug.csv"
+    )
+    metadata_export["train_design_csv"] = cfg.dump_train_design_path or str(
+        Path(cfg.output_dir) / "train_design_debug.csv"
+    )
+    metadata_export["future_design_csv"] = cfg.dump_future_design_path or str(
+        Path(cfg.output_dir) / "future_design_debug.csv"
+    )
+
+    # Optional: aus CV-Residuals ableiten
+    try:
+        if "cv_residuals" in metadata_export and isinstance(metadata_export["cv_residuals"], list):
+            sigma_unscaled = float(np.nanstd(np.asarray(metadata_export["cv_residuals"], dtype=float), ddof=1))
+            if np.isfinite(sigma_unscaled):
+                metadata_export["cv_residual_std_unscaled"] = sigma_unscaled
+                metadata_export["ci_std_error"] = sigma_unscaled
+    except Exception:
+        pass
+
+    metadata_sanitized = _to_jsonable(metadata_export)
+    metadata_path = os.path.join(cfg.output_dir, "production_prediction_metadata.json")
+    safe_write_json(metadata_sanitized, metadata_path, "[S3] Metadata")
+
+    # Logging Diagnose/Ergebnisse (wie bisher, nur Namen angepasst)
+    _logger.info("\n" + "=" * 80)
+    _logger.info("MODELL-DIAGNOSE")
+    _logger.info("=" * 80)
+
+    top_features = (ctx["metadata"] or {}).get("model_complexity", {}).get("top_features", {})
+    if top_features:
+        sorted_feats = sorted(top_features.items(), key=lambda x: x[1], reverse=True)[:5]
+        _logger.info("\n[FEATURE IMPORTANCE] Top 5:")
+        for feat, imp in sorted_feats:
+            _logger.info(f"  • {feat[:60]}: {imp:.3f} ({imp*100:.1f}%)")
+
+    cv_perf = (ctx["metadata"] or {}).get("cv_performance", {})
+    rmse_v, mae_v, r2_v, n_v = _cv_vals(cv_perf)
+    _logger.info("\n[PERFORMANCE-METRIKEN]")
+    _logger.info(f"  CV-RMSE: {_fmt(rmse_v, 2)}")
+    _logger.info(f"  CV-MAE:  {_fmt(mae_v, 2)}")
+    _logger.info(f"  CV-R²:   {_fmt(r2_v, 3)}")
+    if n_v is not None:
+        _logger.info(f"  OOS-Samples: {n_v}")
+
+    last_hist = float(ctx["df_feats"][cfg.target_col].iloc[-1])
+    std_pred = float(np.nanstd(np.asarray(preds, dtype=float))) if len(preds) else float("nan")
+    _logger.info("\n[KONTEXT]")
+    _logger.info(f"  Letzter hist. Wert: {last_hist:.1f}")
+    _logger.info(f"  Erste Prediction:   {float(preds[0]):.1f}")
+    denom = last_hist if last_hist != 0 else np.nan
+
+    if np.isfinite(denom):
+        _logger.info(f"  Abweichung:         {_fmt(((preds[0] - last_hist) / denom * 100), 1)}%")
+    _logger.info(f"  Prediction-STD (Horizont): {_fmt(std_pred, 3)}")
+
+    _logger.info("=" * 80)
+    _logger.info("\n" + "=" * 80)
+    _logger.info("ERGEBNISSE")
+    _logger.info("=" * 80)
+    _logger.info("\n" + df_results.to_string(index=False))
+    _logger.info(f"\nExportiert nach: {output_path}")
+    _logger.info(f"Metadata:        {metadata_path}")
+    _logger.info(f"Modell:          {ctx['model_path']}")
+
+    return metadata_export
 
 
