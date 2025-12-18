@@ -4215,45 +4215,67 @@ def run_startup_preloads():
 # Worker die Preloads aus, während andere warten. Dies verhindert Race Conditions
 # bei der Datei-Generierung.
 
-import fcntl
 import time
 
+try:
+    import fcntl  # type: ignore
+    _HAS_FCNTL = True
+except Exception:
+    fcntl = None  # type: ignore
+    _HAS_FCNTL = False
+
+
 def _run_preload_with_lock():
+<<<<<<< HEAD:src/app.py
     """Führt Preload mit File-Lock aus - nur ein Worker generiert Dateien."""
     lock_file = Path("/app/.gvb_p reload.lock")  # Im App-Verzeichnis (nicht /tmp)
+=======
+    """Führt Preload mit File-Lock aus - nur ein Worker generiert Dateien.
+
+    Fallback: Wenn kein `fcntl` verfügbar ist (z.B. Windows), läuft Preload ohne Lock.
+    """
+>>>>>>> main:app.py
     lg = logging.getLogger("GVB_Dashboard")
-    
+
+    # Cross-Platform Lockfile-Pfad (statt hardcoded '/app/...')
+    lock_file = (APP_ROOT / ".gvb_preload.lock")
+    try:
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+    # Windows / kein fcntl: einfach ohne Lock laufen lassen
+    if not _HAS_FCNTL:
+        lg.info("🔓 Preload-Lock nicht verfügbar (kein fcntl) – führe Initialisierung ohne Lock aus")
+        run_startup_preloads()
+        return
+
     try:
         # Lock-Datei öffnen/erstellen
-        with open(lock_file, 'w') as f:
+        with open(lock_file, "w") as f:
             try:
                 # Versuche exklusiven Lock zu bekommen (non-blocking)
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                
+
                 # Wir haben den Lock - führe Preload aus
                 lg.info("🔒 Preload-Lock erhalten - führe Initialisierung aus")
                 run_startup_preloads()
                 lg.info("✅ Preload abgeschlossen")
-                
+
             except BlockingIOError:
                 # Ein anderer Worker hat den Lock - warte bis er fertig ist
                 lg.info("⏳ Warte auf Preload durch anderen Worker...")
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # Blocking wait
                 lg.info("✅ Preload durch anderen Worker abgeschlossen")
-                
+
     except Exception as e:
         lg.warning(f"⚠️ Preload-Lock Fehler: {e}")
+        # Letzter Fallback: lieber ohne Lock starten, als gar nicht zu starten
+        try:
+            run_startup_preloads()
+        except Exception as e2:
+            lg.warning(f"⚠️ Preload-Fallback ohne Lock fehlgeschlagen: {e2}")
 
-# Automatischer Preload beim Import (z.B. durch gunicorn)
-# WICHTIG: Läuft jetzt IMMER beim Import (nicht nur wenn ENV-Variable gesetzt)
-_lg = logging.getLogger("GVB_Dashboard")
-try:
-    _lg.info("🔄 Module Import: Starte Preload mit File-Lock")
-    _run_preload_with_lock()
-except Exception as _e:
-    _lg.warning(f"⚠️ Preload beim Import fehlgeschlagen: {_e}")
-    import traceback
-    _lg.warning(f"Traceback: {traceback.format_exc()}")
 
 
 # ==============================================================================
