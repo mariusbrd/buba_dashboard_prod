@@ -1,12 +1,17 @@
 from typing import Dict
-from backend.forecaster.forecaster_pipeline import _logger
 
 
 import numpy as np
 import pandas as pd
 
+import logging
 
-import warnings
+_logger = logging.getLogger("forecaster_pipeline")
+if not _logger.handlers:
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+    _logger.addHandler(h)
+_logger.setLevel(logging.INFO)
 
 
 def _fallback_extrapolation(series: pd.Series, horizon: int) -> np.ndarray:

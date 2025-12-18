@@ -4,13 +4,13 @@ Forecaster-Paket für GVB-Dashboard
 """
 
 # Explizite Exports für einfacheren Import
-from .core.model.model_management import get_model_filepath
-from .core.model.model import ModelArtifact
-from .core.config import Config as PipelineConfig
+from src.backend.forecaster.core.model.model_management import get_model_filepath
+from src.backend.forecaster.core.model.model import ModelArtifact
+from src.backend.forecaster.core.config import Config as PipelineConfig
 
 
 try:
-    from .forecaster_pipeline import (
+    from src.backend.forecaster.forecaster_pipeline import (
         run_production_pipeline,
     )
     

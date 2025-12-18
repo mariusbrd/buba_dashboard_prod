@@ -358,7 +358,7 @@ def initialize_data_stores(pathname, existing_data):
             OVERVIEW_DIR / "loader" / "gvb_output.xlsx",
             # letzter Fallback: aktuelles Arbeitsverzeichnis
             Path.cwd() / "gvb_output.xlsx",
-            Path.cwd() / "loader" / "gvb_output.xlsx",
+            Path.cwd() / "src" / "backend" / "loader" / "gvb_output.xlsx",
         ]
 
         _logger.info("[Init] Suche gvb_output.xlsx an:")

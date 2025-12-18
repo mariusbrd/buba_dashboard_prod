@@ -1,14 +1,15 @@
 # =============================================================================
 # KONFIGURATION
 # =============================================================================
-from backend.forecaster.forecaster_pipeline import FORECASTER_DIR
 
 
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Union
 
+
+FORECASTER_DIR = Path(__file__).resolve().parent.parent  
 
 @dataclass
 class Config:

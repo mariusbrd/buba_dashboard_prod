@@ -1,5 +1,4 @@
-from backend.forecaster.core.config import Config
-from backend.forecaster.forecaster_pipeline import _logger
+from src.backend.forecaster.core.config import Config
 
 
 import os
@@ -8,6 +7,14 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import List, Tuple
 
+import logging
+
+_logger = logging.getLogger("forecaster_pipeline")
+if not _logger.handlers:
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+    _logger.addHandler(h)
+_logger.setLevel(logging.INFO)
 
 class ModelArtifact:
     """Container für alle Modell-Artefakte."""

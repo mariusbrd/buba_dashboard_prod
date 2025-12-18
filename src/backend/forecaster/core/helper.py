@@ -1,14 +1,22 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 import numpy as np
 import pandas as pd
 
-from backend.forecaster.core.config import Config
-from backend.forecaster.core.forecast import impute_future_exog_quarterly
-from backend.forecaster.core.loader import _to_jsonable, safe_write_csv, safe_write_json
-from backend.forecaster.core.metrics import _cv_vals
-from backend.forecaster.forecaster_pipeline import _logger
+from src.backend.forecaster.core.config import Config
+from src.backend.forecaster.core.forecast import impute_future_exog_quarterly
+from src.backend.forecaster.core.loader import _to_jsonable, safe_write_csv, safe_write_json
+from src.backend.forecaster.core.metrics import _cv_vals
+
+import logging
+
+_logger = logging.getLogger("forecaster_pipeline")
+if not _logger.handlers:
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+    _logger.addHandler(h)
+_logger.setLevel(logging.INFO)
 
 
 def _fmt(x, ndigits=2, default="n/a"):

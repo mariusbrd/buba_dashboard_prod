@@ -44,7 +44,6 @@ if not _logger.handlers:
     )
     _handler.setFormatter(_formatter)
     _logger.addHandler(_handler)
-_logger = _logger  # Convenience alias
 
 
 # ==============================================================================
@@ -1891,6 +1890,7 @@ class DataManager:
 # ------------------------------------------------------------------------------
 import sys
 from pathlib import Path
+import traceback
 
 forecaster_root = Path(__file__).resolve().parent / "forecaster"
 if forecaster_root.exists() and str(forecaster_root) not in sys.path:
@@ -1899,23 +1899,19 @@ if forecaster_root.exists() and str(forecaster_root) not in sys.path:
 HAS_PIPELINE = False
 DashboardForecastAdapter = None
 
+
 try:
-    # Falls 'forecaster' ein richtiges Package ist (mit __init__.py)
-    from src.backend.forecaster.forecast_integration import DashboardForecastAdapter as _Adapter
+    from src.backend.forecaster.forecast_integration import DashboardForecastAdapter as _Adapter 
     DashboardForecastAdapter = _Adapter
     HAS_PIPELINE = True
     _logger.info("✓ Pipeline-Integration geladen (src.backend.forecaster.forecast_integration)")
-except Exception as e_pkg:
-    try:
-        # Fallback: Modul direkt unter forecaster/ via sys.path
-        from src.backend.forecaster.forecast_integration import DashboardForecastAdapter as _Adapter 
-        DashboardForecastAdapter = _Adapter
-        HAS_PIPELINE = True
-        _logger.info("✓ Pipeline-Integration geladen (src.backend.forecaster.forecast_integration)")
-    except Exception as e_mod:
-        _logger.warning(f"⚠️ Pipeline nicht verfügbar: {e_mod}")
+except Exception as e_mod:
+    _logger.error("⚠️ Pipeline nicht verfügbar")
+    _logger.error("Exception: %s", e_mod)
+    _logger.error("Traceback:\n%s", traceback.format_exc())
 # Loader integration
-loader_path = Path(__file__).parent / "loader"
+loader_path = Path(__file__).parent / "backend/loader"
+_logger.info("THE LOADER PATH IS %s", loader_path)
 if str(loader_path) not in sys.path:
     sys.path.insert(0, str(loader_path))
 
@@ -4226,15 +4222,10 @@ except Exception:
 
 
 def _run_preload_with_lock():
-<<<<<<< HEAD:src/app.py
-    """Führt Preload mit File-Lock aus - nur ein Worker generiert Dateien."""
-    lock_file = Path("/app/.gvb_p reload.lock")  # Im App-Verzeichnis (nicht /tmp)
-=======
     """Führt Preload mit File-Lock aus - nur ein Worker generiert Dateien.
 
     Fallback: Wenn kein `fcntl` verfügbar ist (z.B. Windows), läuft Preload ohne Lock.
     """
->>>>>>> main:app.py
     lg = logging.getLogger("GVB_Dashboard")
 
     # Cross-Platform Lockfile-Pfad (statt hardcoded '/app/...')

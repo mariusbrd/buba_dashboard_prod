@@ -1,4 +1,4 @@
-from backend.forecaster.core.config import Config
+from src.backend.forecaster.core.config import Config
 
 
 import numpy as np

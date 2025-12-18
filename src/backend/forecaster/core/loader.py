@@ -2,11 +2,18 @@
 # Datei- und Pfad-Utilities (Schritt 8)
 # =============================================================================
 from pathlib import Path
-from typing import List
-
-from backend.forecaster.forecaster_pipeline import _logger
+from typing import List, Optional, Union
 
 import pandas as pd
+
+import logging
+
+_logger = logging.getLogger("forecaster_pipeline")
+if not _logger.handlers:
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+    _logger.addHandler(h)
+_logger.setLevel(logging.INFO)
 
 
 def ensure_dir(path: Union[str, Path]) -> None:

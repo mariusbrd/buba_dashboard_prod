@@ -1,14 +1,21 @@
-from backend.forecaster.core.config import Config
-from backend.forecaster.core.extrapolation import _extrapolate_drift_seasonal, extrapolate_with_arima
-from backend.forecaster.forecaster_pipeline import _logger
+from src.backend.forecaster.core.config import Config
+from src.backend.forecaster.core.extrapolation import _extrapolate_drift_seasonal, extrapolate_with_arima
 
 
 import numpy as np
 import pandas as pd
 
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
+import logging
+
+_logger = logging.getLogger("forecaster_pipeline")
+if not _logger.handlers:
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+    _logger.addHandler(h)
+_logger.setLevel(logging.INFO)
 
 def recursive_forecast(model, tj, fut_designs: pd.DataFrame, X_cols: List[str], cfg: Config) -> np.ndarray:
     H = int(len(fut_designs))

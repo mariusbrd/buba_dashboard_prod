@@ -1,7 +1,6 @@
-from backend.forecaster.core.config import Config
-from backend.forecaster.core.metrics import expanding_splits
-from backend.forecaster.core.transform import TargetYJ
-from backend.forecaster.forecaster_pipeline import _logger
+from src.backend.forecaster.core.config import Config
+from src.backend.forecaster.core.metrics import expanding_splits
+from src.backend.forecaster.core.transform import TargetYJ
 
 
 import numpy as np
@@ -9,6 +8,15 @@ import pandas as pd
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import ParameterGrid
 from sklearn.tree import DecisionTreeRegressor
+
+import logging
+
+_logger = logging.getLogger("forecaster_pipeline")
+if not _logger.handlers:
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+    _logger.addHandler(h)
+_logger.setLevel(logging.INFO)
 
 
 def train_best_model_h1(df_feats: pd.DataFrame, cfg: Config):

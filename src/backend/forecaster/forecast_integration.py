@@ -21,17 +21,17 @@ import re
 import numpy as np
 import pandas as pd
 
-from .core.model.model_management import get_model_filepath
+from src.backend.forecaster.core.model.model_management import get_model_filepath
 
-from backend.forecaster.core.model.model_management import get_model_filepath
+from src.backend.forecaster.core.model.model_management import get_model_filepath
 
-from .core.model.model import ModelArtifact
+from src.backend.forecaster.core.model.model import ModelArtifact
 
-from backend.forecaster.core.model.model import ModelArtifact
+from src.backend.forecaster.core.model.model import ModelArtifact
 
-from .core.config import Config as PipelineConfig
+from src.backend.forecaster.core.config import Config as PipelineConfig
 
-from backend.forecaster.core.config import Config as PipelineConfig
+from src.backend.forecaster.core.config import Config as PipelineConfig
 
 # -------------------------
 # Logger einrichten (ohne doppelte Handler)
@@ -62,14 +62,6 @@ def _sym(text: str) -> str:
         text = text.replace(k, v)
     return text
 
-
-# Zweiter, kurz benannter Logger für den Adapter (wird in den Callbacks genutzt)
-_logger = logging.getLogger("DashboardForecastAdapter")
-if not _logger.handlers:
-    _h = logging.StreamHandler(sys.stdout)
-    _h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
-    _logger.addHandler(_h)
-_logger.setLevel(logging.INFO)
 
 # ---------------------------------------------------------------------------
 # Pfade ermitteln und sys.path erweitern
@@ -110,7 +102,7 @@ run_production_pipeline = None  # type: ignore[assignment]
 # Wir versuchen mehrere Varianten in sicherer Reihenfolge
 try:
     # 1) Direkter Import (jetzt mit Pfad-Fix)
-    from src.forecaster.forecaster_pipeline import (  # type: ignore
+    from src.backend.forecaster.forecaster_pipeline import (  # type: ignore
         PipelineConfig,
         run_production_pipeline,
         ModelArtifact,
@@ -122,12 +114,9 @@ try:
 except Exception as e1:
     try:
         # 2) Alternativ: Config heißt 'Config' in manchen Repos
-        from src.forecaster.forecaster_pipeline import (  # type: ignore
-            Config as PipelineConfig,
-            run_production_pipeline,
-            ModelArtifact,
-            get_model_filepath,
-        )
+        from src.backend.forecaster.forecaster_pipeline import PipelineConfig, run_production_pipeline
+        from src.backend.forecaster.core.model.model import ModelArtifact
+        from src.backend.forecaster.core.model.model_management import get_model_filepath
 
         HAS_PIPELINE = True
         _logger.info("[Pipeline] ✓ Import erfolgreich (Config → PipelineConfig)")
@@ -1384,10 +1373,10 @@ class DashboardForecastAdapter:
                 if X_train is None or y_train is None or dates_train is None:
                     _logger.info("[Backtest] Training-Daten nicht in Artifact, extrahiere aus prepared_df")
                     try:
-                        from src.forecaster.forecaster_pipeline import (  # type: ignore
-                            aggregate_to_quarter,
-                            add_deterministic_features,
-                            build_quarterly_lags,
+                        from src.backend.forecaster.core.data import (
+                            aggregate_to_quarter, 
+                            add_deterministic_features, 
+                            build_quarterly_lags
                         )
 
                         df_in = prepared_df.copy()

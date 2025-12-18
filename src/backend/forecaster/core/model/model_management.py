@@ -1,13 +1,22 @@
-from backend.forecaster.core.config import Config
-from backend.forecaster.core.model.model import ModelArtifact
-from backend.forecaster.forecaster_pipeline import _logger
+import hashlib
+import json
+from src.backend.forecaster.core.config import Config
+from src.backend.forecaster.core.model.model import ModelArtifact
 
 
 import pandas as pd
 
 
 import os
-from typing import List
+from typing import List, Optional
+import logging
+
+_logger = logging.getLogger("forecaster_pipeline")
+if not _logger.handlers:
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+    _logger.addHandler(h)
+_logger.setLevel(logging.INFO)
 
 
 def compare_model_performance(model_paths: List[str]):

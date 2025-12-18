@@ -1037,6 +1037,10 @@ def _download_exog_codes(ecb_codes: list) -> pd.DataFrame:
             Log.scenario_table("[Exog-Download] loader.run_from_config beendet.")
 
     except Exception as e:
+        import traceback
+        _logger.error("⚠️ Pipeline nicht verfügbar")
+        _logger.error("Exception: %s", e)
+        _logger.error("Traceback:\n%s", traceback.format_exc())
         Log.scenario_table(f"[Exog-Download] Loader-Fehler: {e}")
         return pd.DataFrame(columns=["date"])
 
@@ -2631,7 +2635,7 @@ def apply_preset_to_model_store(selected_value: Optional[str]):
         raise PreventUpdate
     
     try:
-        from app import _load_user_presets_from_disk
+        from src.app import _load_user_presets_from_disk
         if not str(selected_value).startswith("user_"):
             _logger.debug("[ApplyPreset] Kein User-Preset")
             raise PreventUpdate

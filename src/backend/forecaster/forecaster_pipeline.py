@@ -38,23 +38,23 @@ from typing import List, Optional, Union
 import numpy as np
 import pandas as pd
 
-from backend.forecaster.core.config import Config
-from backend.forecaster.core.data import read_excel
-from backend.forecaster.core.data import aggregate_to_quarter
-from backend.forecaster.core.data import add_deterministic_features
-from backend.forecaster.core.data import build_quarterly_lags
-from backend.forecaster.core.forecast import recursive_forecast
-from backend.forecaster.core.helper import _fmt
-from backend.forecaster.core.helper import build_future_design
-from backend.forecaster.core.helper import _export_prediction
-from backend.forecaster.core.loader import safe_write_csv
-from backend.forecaster.core.loader import harvest_exogs_from_downloader_output
-from backend.forecaster.core.loader import autodetect_downloader_output
-from backend.forecaster.core.metrics import create_comprehensive_metadata
-from backend.forecaster.core.metrics import _cv_vals
-from backend.forecaster.core.model.model import ModelArtifact
-from backend.forecaster.core.model.model_management import get_model_filepath
-from backend.forecaster.core.training import train_best_model_h1
+from src.backend.forecaster.core.config import Config
+from src.backend.forecaster.core.data import read_excel
+from src.backend.forecaster.core.data import aggregate_to_quarter
+from src.backend.forecaster.core.data import add_deterministic_features
+from src.backend.forecaster.core.data import build_quarterly_lags
+from src.backend.forecaster.core.forecast import recursive_forecast
+from src.backend.forecaster.core.helper import _fmt
+from src.backend.forecaster.core.helper import build_future_design
+from src.backend.forecaster.core.helper import _export_prediction
+from src.backend.forecaster.core.loader import safe_write_csv
+from src.backend.forecaster.core.loader import harvest_exogs_from_downloader_output
+from src.backend.forecaster.core.loader import autodetect_downloader_output
+from src.backend.forecaster.core.metrics import create_comprehensive_metadata
+from src.backend.forecaster.core.metrics import _cv_vals
+from src.backend.forecaster.core.model.model import ModelArtifact
+from src.backend.forecaster.core.model.model_management import get_model_filepath
+from src.backend.forecaster.core.training import train_best_model_h1
 
 # Pandas Anzeigeoptionen (nur für lokale Diagnose)
 pd.set_option("display.width", 140)

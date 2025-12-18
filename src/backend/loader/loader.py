@@ -647,7 +647,7 @@ import asyncio
 import logging
 import yaml
 import pandas as pd
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from pathlib import Path
 
 from transforms import (
