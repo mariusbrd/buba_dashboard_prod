@@ -1,6 +1,9 @@
 # =============================================================================
 # Datei- und Pfad-Utilities (Schritt 8)
 # =============================================================================
+import glob
+import json
+import os
 from pathlib import Path
 from typing import List, Optional, Union
 

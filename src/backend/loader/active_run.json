@@ -1,16 +1,13 @@
 {
   "run_cache_tag": "ph_ph_wertpapiere_fluss_h6_a90ab68e",
-  "run_loader_dir": "C:\\Users\\Timta\\Documents\\Coding_Projects\\buba_dashboard_prod\\src\\backend\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251218T134622",
-  "expected_output": "C:\\Users\\Timta\\Documents\\Coding_Projects\\buba_dashboard_prod\\src\\backend\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251218T134622\\output.xlsx",
+  "run_loader_dir": "C:\\Users\\Timta\\Documents\\Coding_Projects\\buba_dashboard_prod\\src\\backend\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251219T100142",
+  "expected_output": "C:\\Users\\Timta\\Documents\\Coding_Projects\\buba_dashboard_prod\\src\\backend\\loader\\runs\\ph_ph_wertpapiere_fluss_h6_a90ab68e\\20251219T100142\\output.xlsx",
   "requested_exog": [
-    "ICP.M.DE.N.000000.4.ANR",
-    "ICP.M.DE.N.041000.4.ANR",
-    "ICP.M.DE.N.041000.4.INX",
-    "ICP.M.DE.N.ADMNRG.4.INX"
+    "ICP.M.DE.N.000000.4.ANR"
   ],
   "ui_target": "Wertpapiere",
   "ui_mode": "fluss",
   "ui_sektor": "PH",
   "horizon": 6,
-  "created_at": "2025-12-18T13:46:22.843700+00:00"
+  "created_at": "2025-12-19T10:01:42.345071+00:00"
 }

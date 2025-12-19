@@ -239,7 +239,7 @@ app = _CallbackProxy()
 # ==============================================================================
 
 try:
-    from forecast_integration import DashboardForecastAdapter, HAS_PIPELINE
+    from src.backend.forecaster.forecast_integration import DashboardForecastAdapter, HAS_PIPELINE
 except Exception:
     DashboardForecastAdapter = None
     HAS_PIPELINE = False
@@ -1914,7 +1914,7 @@ def _create_pipeline_chart(
                     line_shape='linear'
                 ))
 
-    title_target = target if target != 'gesamt' else 'Gesamt'
+    # ti tle_target = target if target != 'gesamt' else 'Gesamt'
     legend_cfg = dict(
         title='',
         orientation='h',
@@ -3976,7 +3976,6 @@ def create_pipeline_forecast(
             show_backtest=bool(show_backtest),
             backtest_mode="overlay",
         )
-
         # 5) Metriken
         simple = _compute_simple_metrics(metadata if isinstance(metadata, dict) else {})
         _logger.debug(f"Metriken berechnet: MAE={simple.get('mae', 0):.2f}, R²={simple.get('r2', 0):.3f}")
@@ -3998,15 +3997,16 @@ def create_pipeline_forecast(
         r2_txt    = _fmt_num(simple.get("r2"), nd=3)
         wape_txt  = _fmt_pct(simple.get("wape"), nd=1)
         bias_txt  = _fmt_pct(simple.get("bias_pct"), nd=1)
-        smape_txt = _fmt_pct(simple.get("smape"), nd=1)
-        dir_txt   = _fmt_pct(simple.get("directional"), nd=0)
+        # smape_txt = _fmt_pct(simple.get("smape"), nd=1)
+        # dir_txt   = _fmt_pct(simple.get("directional"), nd=0)
 
         coverage = simple.get("coverage") or {}
-        cov80 = _fmt_pct(coverage.get(80), nd=1)
+        # cov80 = _fmt_pct(coverage.get(80), nd=1)
         cov95 = _fmt_pct(coverage.get(95), nd=1)
 
         # Neue UI Struktur (Anti-Confusion)
         if dbc is not None:
+
             # Hilfsfunktion für Label mit Tooltip-Icon
             def _lbl(text, tooltip_id, tooltip_text):
                 return html.Div([

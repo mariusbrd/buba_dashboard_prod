@@ -103,7 +103,7 @@ class Log:
 # 1) Imports (Dash, Plotly, Pandas, ...)
 # ==============================================================================
 import dash
-from dash import dcc, html, Input, Output, State, dash_table
+from dash import dcc, html, Input, Output, dash_table
 
 # Backward compatibility for Dash trigger context
 try:
@@ -3986,7 +3986,6 @@ app.index_string = '''
 
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
-
     # Data Stores (Thread-sicher)
     dcc.Store(id='gvb-data-store', storage_type='memory'),
     dcc.Store(id='exog-data-store', storage_type='memory'),
@@ -4285,5 +4284,6 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8080,
         # debug=True
-        debug=False
+        debug=True,
+        dev_tools_silence_routes_logging=False
     )

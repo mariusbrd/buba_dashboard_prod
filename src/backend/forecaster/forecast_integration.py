@@ -2243,7 +2243,7 @@ class DashboardForecastAdapter:
                 )
 
             exog_cols_only = [c for c in df.columns if c not in ("date", "target_value")]
-
+            _logger.info("DELETE: EXOG COLS: %s", exog_cols_only)
             tgt_non_null = df["target_value"].dropna()
             tmin = float(tgt_non_null.min()) if not tgt_non_null.empty else np.nan
             tmax = float(tgt_non_null.max()) if not tgt_non_null.empty else np.nan
@@ -2335,6 +2335,7 @@ class DashboardForecastAdapter:
                     selected_exog,
                     self.exog_data,
                 )
+
 
                 missing_exogs = [
                     req for req in selected_exog if req not in resolved_exog_map

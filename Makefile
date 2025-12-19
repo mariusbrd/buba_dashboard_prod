@@ -112,15 +112,15 @@ clean: ## Räumt temporäre Dateien und Cache-Verzeichnisse auf
 	find . -type f -name "*.pyo" -delete 2>/dev/null || true
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 	@# Temporäre Daten
-	rm -rf forecaster/trained_models/* 2>/dev/null || true
-	rm -rf forecaster/trained_outputs/* 2>/dev/null || true
-	rm -rf scenario/data/* 2>/dev/null || true
-	rm -rf scenario/models_scenario/* 2>/dev/null || true
-	rm -rf scenario/scenario_cache/* 2>/dev/null || true
-	rm -rf loader/runs/* 2>/dev/null || true
-	rm -f loader/gvb_output.parquet 2>/dev/null || true
-	rm -f loader/gvb_output.xlsx 2>/dev/null || true
-	rm -f scenario/.scenario_month.stamp 2>/dev/null || true
+	rm -rf src/backend/forecaster/trained_models/* 2>/dev/null || true
+	rm -rf src/backend/forecaster/trained_outputs/* 2>/dev/null || true
+	rm -rf src/frontend/scenario/data/* 2>/dev/null || true
+	rm -rf src/frontend/scenario/models_scenario/* 2>/dev/null || true
+	rm -rf src/frontend/scenario/scenario_cache/* 2>/dev/null || true
+	rm -rf src/backend/loader/runs/* 2>/dev/null || true
+	rm -f src/backend/loader/gvb_output.parquet 2>/dev/null || true
+	rm -f src/backend/loader/gvb_output.xlsx 2>/dev/null || true
+	rm -f src/backend/scenario/.scenario_month.stamp 2>/dev/null || true
 
 clean-all: clean docker-clean ## Vollständiger Cleanup inkl. Docker
 
