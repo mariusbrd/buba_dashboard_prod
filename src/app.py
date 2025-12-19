@@ -186,20 +186,20 @@ except Exception:
 # WICHTIG: scenario/data ist NICHT hier, weil dort output.xlsx/analysis_data.xlsx
 # gespeichert werden, die beim Start heruntergeladen werden!
 ALWAYS_PURGE_PATHS = [
-    APP_ROOT / "forecaster" / "trained_models",
-    APP_ROOT / "forecaster" / "trained_outputs",
-    APP_ROOT / "loader" / "gvb_output.parquet",
-    APP_ROOT / "loader" / "gvb_output.xlsx",
-    APP_ROOT / "loader" / "runs", 
+    APP_ROOT / "src" / "backend" /"forecaster" / "trained_models",
+    APP_ROOT / "src" / "backend" / "forecaster" / "trained_outputs",
+    APP_ROOT / "src" / "backend" / "loader" / "gvb_output.parquet",
+    APP_ROOT / "src" / "backend" / "loader" / "gvb_output.xlsx",
+    APP_ROOT / "src" / "backend" / "loader" / "runs", 
     # ENTFERNT: APP_ROOT / "scenario" / "data",  ← Enthält output.xlsx/analysis_data.xlsx!
-    APP_ROOT / "scenario" / "models_scenario",
-    APP_ROOT / "scenario" / "scenario_cache",
-    APP_ROOT / "scenario" / ".scenario_month.stamp",
+    APP_ROOT / "src" / "frontend" / "scenario" / "models_scenario",
+    APP_ROOT / "src" / "frontend" / "scenario" / "scenario_cache",
+    APP_ROOT / "src" / "frontend" / "scenario" / ".scenario_month.stamp",
 ]
 
 # Periodic-Clean: nur diese Ordner/Dateien werden nach 12h aufgeräumt
-SCENARIO_DATA_DIR = APP_ROOT / "scenario" / "data"
-SCENARIO_MODELS_DIR = APP_ROOT / "scenario" / "models_scenario"
+SCENARIO_DATA_DIR = APP_ROOT / "src" / "frontend" / "scenario" / "data"
+SCENARIO_MODELS_DIR = APP_ROOT / "src" / "frontend" / "scenario" / "models_scenario"
 SCENARIO_MAX_AGE_HOURS = 12  # Dateien älter als 12h werden entfernt
 
 # Flags gegen Mehrfachausführung (z. B. durch Flask/Dash Reload)

@@ -21,16 +21,8 @@ import re
 import numpy as np
 import pandas as pd
 
-from src.backend.forecaster.core.model.model_management import get_model_filepath
-
-from src.backend.forecaster.core.model.model_management import get_model_filepath
-
+from src.backend.forecaster.core.model.model_management import get_model_filepath  
 from src.backend.forecaster.core.model.model import ModelArtifact
-
-from src.backend.forecaster.core.model.model import ModelArtifact
-
-from src.backend.forecaster.core.config import Config as PipelineConfig
-
 from src.backend.forecaster.core.config import Config as PipelineConfig
 
 # -------------------------
@@ -269,7 +261,7 @@ class DashboardForecastAdapter:
                 self.exog_data = cache_df
                 _logger.info(
                     "[Adapter|Exog] Cache-Fallback beim Init verwendet "
-                    "(loader/financial_cache/output.xlsx)."
+                    "(src/backend/loader/financial_cache/output.xlsx)."
                 )
 
         _logger.info(
@@ -585,7 +577,7 @@ class DashboardForecastAdapter:
             requested_exogs = list(selected_exog or [])
             mapping: dict[str, str] = {}
             missing: list[str] = []
-
+            
             if not prepared_df.empty and requested_exogs:
                 # DF-Spalten in kanonische Form bringen
                 col_norm_map: dict[str, str] = {}
@@ -727,7 +719,7 @@ class DashboardForecastAdapter:
             # ---------------------------------------------------------------------
             # 8) Loader-Quelle nur feststellen (non-blocking)
             # ---------------------------------------------------------------------
-            global_loader_xlsx = base_dir / "loader" / "financial_cache" / "output.xlsx"
+            global_loader_xlsx = base_dir / "src" / "backend" /  "loader" / "financial_cache" / "output.xlsx"
             if expected_run_output.exists():
                 loader_source = "run"
                 _logger.info(
@@ -1607,13 +1599,13 @@ class DashboardForecastAdapter:
 
             if base_dir is None:
                 base_dir = Path(__file__).resolve().parent.parent
-            cache_file = base_dir / "loader" / "financial_cache" / "output.xlsx"
+            cache_file = base_dir / "src" / "backend" / "loader" / "financial_cache" / "output.xlsx"
             if not cache_file.exists():
                 return pd.DataFrame()
             df_loader = pd.read_excel(cache_file)
             if "Datum" in df_loader.columns and "date" not in df_loader.columns:
                 df_loader = df_loader.rename(columns={"Datum": "date"})
-            if "date" in df_loader.columns:
+            if "date" in df_loader.columns: 
                 df_loader["date"] = pd.to_datetime(df_loader["date"], errors="coerce")
                 df_loader = df_loader.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
             return df_loader
@@ -2243,7 +2235,6 @@ class DashboardForecastAdapter:
                 )
 
             exog_cols_only = [c for c in df.columns if c not in ("date", "target_value")]
-            _logger.info("DELETE: EXOG COLS: %s", exog_cols_only)
             tgt_non_null = df["target_value"].dropna()
             tmin = float(tgt_non_null.min()) if not tgt_non_null.empty else np.nan
             tmax = float(tgt_non_null.max()) if not tgt_non_null.empty else np.nan
@@ -3229,7 +3220,7 @@ class DashboardForecastAdapter:
             _logger.info("[Adapter|Reuse] Verwende früheren Run: %s", xlsx)
 
             try:
-                fin_dir = base_dir / "loader" / "financial_cache"
+                fin_dir = base_dir / "src" / "backend" / "loader" / "financial_cache"
                 fin_dir.mkdir(parents=True, exist_ok=True)
                 fin_out = fin_dir / "output.xlsx"
                 shutil.copy2(xlsx, fin_out)

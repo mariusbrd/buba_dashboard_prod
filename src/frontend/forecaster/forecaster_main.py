@@ -946,7 +946,7 @@ def _download_exog_codes(ecb_codes: list) -> pd.DataFrame:
         from datetime import datetime, timezone
 
         # App-Root: .../forecaster/ → ein Ordner hoch
-        loader_dir = APP_ROOT / "loader"
+        loader_dir = APP_ROOT.parent.parent / "src/backend/loader"
 
 
         # globaler Cache (dürfen wir weiter nutzen)
@@ -1758,7 +1758,8 @@ def _create_pipeline_chart(
             except Exception:
                 pass
 
-    y_candidates = ['yhat', 'Forecast', 'forecast', 'y_pred', 'yhat_mean', 'pred', 'value']
+
+    y_candidates = ['yhat', 'Forecast', 'forecast', 'y_pred', 'yhat_mean', 'Prediction', 'pred', 'value']
     fc_val = next((c for c in y_candidates if c in fc.columns), None)
 
     confidence_levels = [
@@ -3645,7 +3646,7 @@ def prewarm_hc_presets(n_clicks, gvb_json, exog_store_json):
     if not n_clicks:
         raise PreventUpdate
 
-    def _log(msg):
+    def  _log(msg):
         try:
             Log.scenario_table(msg)
         except Exception:
