@@ -1937,10 +1937,59 @@ def _find_scenario_excel() -> Path:
     return candidates[0]
 
 
+def _ensure_scenario_output_or_rebuild() -> Path:
+    """
+    Stellt die Szenario-Basisdatei sicher.
+
+    Minimaler Seiteneinstieg-Fallback: Wenn scenario/data/output.xlsx fehlt,
+    nutzt er dieselbe Downloader-Routine wie der App-Startup und schreibt die Datei nach.
+    """
+    xlsx_path = _find_scenario_excel()
+    if xlsx_path.exists():
+        return xlsx_path
+
+    config_path = Path(__file__).parent / "config.yaml"
+    if not config_path.exists():
+        raise FileNotFoundError(f"Scenario-Datei und config.yaml nicht gefunden: {xlsx_path}")
+
+    try:
+        try:
+            from .scenario_dataloader import DashDownloadConfig, DashDataDownloader  # type: ignore
+        except Exception:
+            from scenario_dataloader import DashDownloadConfig, DashDataDownloader  # type: ignore
+
+        cfg = DashDownloadConfig.from_yaml(config_path)
+        out_path = Path(cfg.output_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            Log.warn(f"Scenario-Datei fehlt: {xlsx_path} - starte Rebuild.")
+        except Exception:
+            logger.warning("Scenario-Datei fehlt: %s - starte Rebuild.", xlsx_path)
+
+        runner = DashDataDownloader(
+            cfg,
+            logger=lambda m: (Log.scenario(m) if "Log" in globals() else logger.info(str(m))),
+        )
+        _, written_file = runner.run(save=True)
+        rebuilt_path = Path(written_file or out_path)
+        if rebuilt_path.exists():
+            return rebuilt_path
+        if out_path.exists():
+            return out_path
+    except Exception as exc:
+        raise FileNotFoundError(
+            f"Scenario-Datei nicht gefunden und Rebuild fehlgeschlagen: {xlsx_path}"
+        ) from exc
+
+    raise FileNotFoundError(f"Scenario-Datei wurde beim Rebuild nicht erzeugt: {xlsx_path}")
+
+
 def _load_scenario_final_dataset() -> pd.DataFrame:
     base = Path(__file__).parent                 # …/scenario
     primary  = base / "data" / "output.xlsx"     # ✓ richtig
     fallback = base / "output.xlsx"              # fallback
+    _ensure_scenario_output_or_rebuild()
     xlsx_path = primary if primary.exists() else fallback
     if not xlsx_path.exists():
         raise FileNotFoundError(
@@ -2472,6 +2521,15 @@ def init_exog_override_table_quarterly(pathname):
     # 2) Szenario-Datei im *richtigen* Ordner suchen
     base = Path(__file__).parent          # .../scenario
     data_dir = base / "data"              # .../scenario/data
+    try:
+        _ensure_scenario_output_or_rebuild()
+    except Exception as exc:
+        try:
+            Log.warn(f"Keine Szenario-Datei in ./scenario/data/ gefunden - Rebuild fehlgeschlagen: {exc}")
+        except Exception:
+            logger.warning("Keine Szenario-Datei in ./scenario/data/ gefunden - Rebuild fehlgeschlagen: %s", exc)
+        raise dash.exceptions.PreventUpdate
+
     candidates = [
         data_dir / "output.xlsx",         # die „echte“ Datei aus dem Downloader
         data_dir / "transformed_output.xlsx",

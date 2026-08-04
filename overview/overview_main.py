@@ -532,9 +532,10 @@ def initialize_data_stores(pathname, existing_data):
         Output('zeitraum-slider', 'marks')
     ],
     Input('data-metadata-store', 'data'),
+    State('zeitraum-slider', 'value'),
     prevent_initial_call=False
 )
-def update_zeitraum_slider(metadata):
+def update_zeitraum_slider(metadata, current_value):
     """
     Updates the time range slider based on loaded data metadata.
     Dynamically sets min, max, value, and marks based on actual data range.
@@ -562,19 +563,11 @@ def update_zeitraum_slider(metadata):
             # (Month - 1) // 3 derives quarter index (0, 1, 2, 3)
             return dt.year + ((dt.month - 1) // 3) * 0.25
 
-        slider_min = math.floor(date_to_quarter_decimal(min_date))
+        slider_min = float(math.floor(date_to_quarter_decimal(min_date)))
         
         # Calculate precise max (e.g. 2025.25 for Q2)
         precise_max = date_to_quarter_decimal(max_date)
-        
-        # Slider Scale: always full years for clean look
-        slider_max = math.ceil(precise_max)
-        
-        # If precise_max is strictly calculating the start of the quarter (e.g. 2025.0),
-        # but the data covers the full year, slider_max should just be sufficient.
-        # Ensure slider_max is at least precise_max
-        if slider_max < precise_max:
-             slider_max = math.ceil(precise_max + 0.01)
+        slider_max = float(precise_max)
 
         # Default value: show last 5 years up to the ACTUAL data end
         start_target = precise_max - 5
@@ -583,20 +576,29 @@ def update_zeitraum_slider(metadata):
         # Snap start to quarter grid as well to be safe
         start_value = math.floor(start_value * 4) / 4.0
 
+        if isinstance(current_value, (list, tuple)) and len(current_value) == 2:
+            try:
+                current_start = float(current_value[0])
+                if slider_min <= current_start <= slider_max:
+                    start_value = current_start
+            except (TypeError, ValueError):
+                pass
+
         slider_value = [start_value, precise_max]
         
         # Generate marks - only 5-year intervals plus min and max years
         slider_marks = {}
         
         # Add year marks every 5 years
-        for year in range(slider_min, slider_max + 1, 5):
+        for year in range(int(slider_min), int(math.floor(slider_max)) + 1, 5):
             slider_marks[year] = str(year)
         
         # Always show min and max years
         if slider_min not in slider_marks:
-            slider_marks[slider_min] = str(slider_min)
-        if slider_max not in slider_marks:
-            slider_marks[slider_max] = str(slider_max)
+            slider_marks[slider_min] = str(int(slider_min))
+        max_year = int(math.floor(slider_max))
+        if max_year not in slider_marks:
+            slider_marks[max_year] = str(max_year)
         
         logger.info(f"[Slider Update] min={slider_min}, max={slider_max}, value={slider_value}")
         
