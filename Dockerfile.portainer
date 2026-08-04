@@ -80,4 +80,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=40s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/', timeout=3)" || exit 1
 
 # Development-Server starten (kein gunicorn, damit Debug-Mode funktioniert)
-CMD ["python", "app.py"]
+CMD ["python", "src.app"]

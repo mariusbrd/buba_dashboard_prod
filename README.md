@@ -60,10 +60,8 @@ Das Dashboard ist dann verfügbar unter: **http://localhost:8080**
 
 | Befehl | Beschreibung |
 |--------|--------------|
-| `make check-python` | Überprüft Python-Version (3.11+) |
-| `make check-deps` | Prüft System-Abhängigkeiten |
+| `make check-python` | Überprüft Python-Version (3.11-3.13) |
 | `make install` | Installiert alle Python-Pakete |
-| `make setup` | Vollständiges Setup |
 | `make upgrade-deps` | Aktualisiert alle Pakete |
 
 ### Entwicklung
@@ -147,32 +145,32 @@ docker-compose logs -f
 
 ```
 buba_dashboard/
-├── app.py                    # Hauptanwendung (Dash-App)
-├── Makefile                  # Build- und Deployment-Automatisierung
-├── requirements.txt          # Python-Abhängigkeiten
-├── Dockerfile               # Container-Definition
-├── docker-compose.yaml      # Docker-Orchestrierung
+├── Makefile                            # Build- und Deployment-Automatisierung
+├── requirements.txt                    # Python-Abhängigkeiten
+├── Dockerfile                          # Container-Definition
+├── docker-compose.yaml                 # Docker-Orchestrierung
 │
-├── forecaster/              # Prognose-Module
-│   ├── forecaster_main.py   # Hauptlogik für Prognosen
-│   ├── user_presets/        # Gespeicherte Benutzer-Konfigurationen
-│   └── trained_models/      # Trainierte ML-Modelle
+├── src/ 
+│    ├── app.py                         # Hauptanwendung (Dash-App)
+│    ├── backend/
+│        ├── forecaster/                # Prognose-Module
+│           ├── forecaster_main.py      # Hauptlogik für Prognosen
+│           ├── user_presets/           # Gespeicherte Benutzer-Konfigurationen
+│           └── trained_models/         # Trainierte ML-Modelle
+│        ├── loader/                    # Daten-Loader
+│           ├── loader.py               # Datenimport und -verarbeitung
+│           └── instructor.py           # Daten-Instruktionen
 │
-├── geospacial/              # Geografische Analysen
-│   ├── geospacial_main.py   # Geo-Visualisierungen
-│   └── geospacial_viz.py    # Karten und Regionen
-│
-├── loader/                  # Daten-Loader
-│   ├── loader.py            # Datenimport und -verarbeitung
-│   └── instructor.py        # Daten-Instruktionen
-│
-├── overview/                # Übersichts-Dashboard
-│   └── overview_main.py     # KPIs und Hauptansicht
-│
-└── scenario/                # Szenario-Analysen
-    ├── scenario_main.py     # Szenario-Berechnungen
-    ├── scenario_analyzer.py # Analysewerkzeuge
-    └── scenario_dataloader.py # Szenario-Daten
+│    ├── frontend/ 
+│        ├── geospacial/                # Geografische Analysen
+│           ├── geospacial_main.py      # Geo-Visualisierungen
+│           └── geospacial_viz.py       # Karten und Regionen
+│         ├── overview/                 # Übersichts-Dashboard
+│           └── overview_main.py        # KPIs und Hauptansicht
+│         └── scenario/                 # Szenario-Analysen
+│            ├── scenario_main.py       # Szenario-Berechnungen
+│            ├── scenario_analyzer.py   # Analysewerkzeuge
+│            └── scenario_dataloader.py # Szenario-Daten
 ```
 
 ---
