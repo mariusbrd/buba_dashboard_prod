@@ -4180,7 +4180,7 @@ def run_startup_preloads():
                 lg.info(f"⏬ Lade Szenario Daten ({cfg.start_date} → {cfg.end_date}) …")
                 runner = DashDataDownloader(
                     cfg,
-                    _logger=lambda m: (Log.scenario(m) if 'Log' in globals() else lg.info(str(m)))
+                    logger=lambda m: (Log.scenario(m) if 'Log' in globals() else lg.info(str(m)))
                 )
                 final_df, written_file = runner.run(save=True)
                 mark_ran_this_month(scenario_path)

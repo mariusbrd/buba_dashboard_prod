@@ -60,6 +60,14 @@ def _now_berlin() -> datetime:
 # ---------------------------------------------------------------------------
 import sys
 
+try:
+    import transforms  # type: ignore  # noqa: F401
+except Exception:
+    try:
+        from src.backend.loader import loader as _loader_transforms_bootstrap  # type: ignore  # noqa: F401
+    except Exception:
+        pass
+
 # Default-Attr-Container
 _detect_data_source = None
 _parse_index_specification = None
@@ -197,8 +205,8 @@ get_excel_engine = _get_excel_engine
 # ROBUSTER IMPORT DER QUELLEN (du hast sie im Ordner loader als 'sources.*')
 # ---------------------------------------------------------------------------
 try:
-    from data_sources.ecb_client import fetch_ecb_async, fetch_ecb_sync  # type: ignore
-    from data_sources.buba_client import fetch_buba_async, fetch_buba_sync  # type: ignore
+    from .data_sources.ecb_client import fetch_ecb_async, fetch_ecb_sync  # type: ignore
+    from .data_sources.buba_client import fetch_buba_async, fetch_buba_sync  # type: ignore
 except Exception as e:
     # Fallback auf deine tatsächlichen Modulnamen
     try:
